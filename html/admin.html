@@ -1,0 +1,1535 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>青職同行管理後台</title>
+  <style>
+:root {
+  --bg:#eef3f6;
+  --panel:#fff;
+  --soft:#f8fafb;
+  --ink:#1f2d3a;
+  --muted:#637283;
+  --line:#dce4ea;
+  --brand:#256f8f;
+  --brand-dark:#174d66;
+  --green:#208863;
+  --red:#bb3f46;
+  --amber:#b97922;
+  --shadow:0 16px 34px rgba(33,48,63,.12);
+  --radius:12px
+}
+* {
+  box-sizing:border-box
+}
+body {
+  margin:0;
+  min-height:100vh;
+  background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(238,243,246,.94)),var(--bg);
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif
+}
+h1,h2,h3,p {
+  margin:0
+}
+h1 {
+  font-size:28px;
+  line-height:1.15
+}
+h2 {
+  font-size:22px
+}
+h3 {
+  font-size:16px
+}
+p {
+  color:var(--muted);
+  line-height:1.55
+}
+button,input,select {
+  font:inherit
+}
+button {
+  cursor:pointer
+}
+button:disabled {
+  cursor:not-allowed;
+  opacity:.55
+}
+.hidden {
+  display:none!important
+}
+.shell {
+  width:min(1280px,100%);
+  margin:auto;
+  padding:18px
+}
+.topbar,.section-head,.toolbar,.row-actions {
+  display:flex;
+  gap:12px
+}
+.topbar,.section-head {
+  align-items:flex-start;
+  justify-content:space-between;
+  margin-bottom:14px
+}
+.toolbar,.row-actions {
+  flex-wrap:wrap;
+  align-items:center
+}
+.brand {
+  display:grid;
+  gap:4px
+}
+.brand small {
+  color:var(--brand);
+  font-weight:900
+}
+.panel {
+  background:rgba(255,255,255,.96);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow)
+}
+.layout {
+  display:grid;
+  grid-template-columns:210px minmax(0,1fr);
+  gap:14px;
+  align-items:start
+}
+.sidebar {
+  position:sticky;
+  top:12px;
+  padding:10px;
+  display:grid;
+  gap:6px
+}
+.tab-btn {
+  width:100%;
+  min-height:44px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:var(--muted);
+  text-align:left;
+  padding:0 12px;
+  font-weight:850
+}
+.tab-btn.active {
+  background:var(--brand);
+  color:#fff;
+  box-shadow:0 8px 16px rgba(37,111,143,.18)
+}
+.content,.section,.mini-list,.settings-grid {
+  display:grid;
+  gap:14px;
+  min-width:0
+}
+.section {
+  padding:16px
+}
+.login-card {
+  width:min(460px,100%);
+  margin:52px auto;
+  padding:24px;
+  display:grid;
+  gap:14px
+}
+.field {
+  display:grid;
+  gap:6px;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:850
+}
+input,select {
+  width:100%;
+  min-height:42px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  color:var(--ink);
+  padding:0 11px;
+  outline:none
+}
+input:focus,select:focus {
+  border-color:var(--brand);
+  box-shadow:0 0 0 3px rgba(37,111,143,.12)
+}
+.search-input {
+  width:min(300px,100%)
+}
+.btn {
+  min-height:40px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  color:var(--ink);
+  padding:0 12px;
+  font-weight:850
+}
+.btn.primary {
+  border-color:var(--brand);
+  background:var(--brand);
+  color:#fff
+}
+.btn.green {
+  border-color:rgba(32,136,99,.2);
+  background:#e9f6f0;
+  color:var(--green)
+}
+.btn.red {
+  border-color:rgba(187,63,70,.2);
+  background:#fff0f1;
+  color:var(--red)
+}
+.btn.amber {
+  border-color:rgba(185,121,34,.22);
+  background:#fff6e7;
+  color:var(--amber)
+}
+.btn.small {
+  min-height:32px;
+  border-radius:8px;
+  font-size:13px;
+  padding:0 9px
+}
+.metrics {
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:10px
+}
+.metric {
+  padding:14px;
+  background:var(--soft);
+  border:1px solid var(--line);
+  border-radius:12px
+}
+.metric span {
+  color:var(--muted);
+  font-size:13px;
+  font-weight:850
+}
+.metric strong {
+  display:block;
+  margin-top:8px;
+  font-size:28px;
+  line-height:1;
+  color:var(--brand-dark)
+}
+.split {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px
+}
+.mini-item {
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  display:grid;
+  gap:4px
+}
+.mini-item strong {
+  font-size:14px
+}
+.mini-item small {
+  color:var(--muted)
+}
+.table-wrap {
+  width:100%;
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff
+}
+table {
+  width:100%;
+  min-width:980px;
+  border-collapse:collapse
+}
+th,td {
+  padding:10px;
+  border-bottom:1px solid #edf2f5;
+  text-align:left;
+  vertical-align:top;
+  font-size:13px;
+  line-height:1.45
+}
+th {
+  position:sticky;
+  top:0;
+  z-index:1;
+  background:#f5f8fa;
+  color:#465765;
+  font-weight:950
+}
+tr:last-child td {
+  border-bottom:0
+}
+.cell-main {
+  display:grid;
+  gap:4px
+}
+.cell-main small {
+  color:var(--muted)
+}
+.pill {
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  padding:0 8px;
+  border-radius:999px;
+  background:#edf3f6;
+  color:#526372;
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap
+}
+.pill.active,.pill.open,.pill.enabled {
+  background:#e8f6ef;
+  color:var(--green)
+}
+.pill.disabled {
+  background:#fff0f1;
+  color:var(--red)
+}
+.pill.closed {
+  background:#eceff2;
+  color:#6a737c
+}
+.message {
+  min-height:40px;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:#f8fafb;
+  color:var(--muted);
+  white-space:pre-wrap
+}
+.message.success {
+  border-color:#bce1cf;
+  background:#edf8f2;
+  color:var(--green);
+  font-weight:850
+}
+.message.error {
+  border-color:#f0bdc0;
+  background:#fff3f3;
+  color:var(--red);
+  font-weight:850
+}
+.setting-category {
+  display:grid;
+  gap:8px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--soft)
+}
+.setting-category h3 {
+  color:var(--brand-dark)
+}
+.setting-category p {
+  font-size:13px
+}
+.setting-health {
+  display:grid;
+  gap:8px
+}
+.setting-health .mini-item {
+  border-left:4px solid var(--brand)
+}
+.setting-health.is-healthy .mini-item {
+  border-left-color:var(--green);
+  background:#edf8f2
+}
+.setting-health.has-issues .mini-item {
+  border-left-color:var(--amber);
+  background:#fffaf0
+}
+.setting-row {
+  display:grid;
+  grid-template-columns:minmax(220px,1fr) minmax(220px,1.35fr) auto;
+  gap:10px;
+  align-items:center;
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff
+}
+.setting-meta {
+  display:grid;
+  gap:4px
+}
+.setting-meta p {
+  font-size:12px
+}
+.setting-meta small {
+  color:var(--brand);
+  font-weight:800
+}
+.chest-setting-preview {
+  display:flex;
+  align-items:center;
+  gap:10px
+}
+.chest-setting-preview img {
+  width:54px;
+  height:54px;
+  object-fit:contain;
+  border-radius:10px;
+  background:#fff;
+  border:1px solid var(--line)
+}
+.chest-setting-fields {
+  display:grid;
+  gap:8px
+}
+.setting-target {
+  display:inline-flex;
+  width:max-content;
+  max-width:100%;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#e8f2f6;
+  color:var(--brand-dark);
+  font-size:11px;
+  font-weight:900
+}
+.tool-form {
+  display:grid;
+  grid-template-columns:minmax(120px,180px) 1fr auto;
+  gap:10px;
+  align-items:end
+}
+.loading {
+  position:fixed;
+  inset:0;
+  z-index:50;
+  display:grid;
+  place-items:center;
+  background:rgba(31,45,58,.28);
+  backdrop-filter:blur(3px)
+}
+.loading-card {
+  min-width:220px;
+  padding:18px;
+  border-radius:14px;
+  background:#fff;
+  border:1px solid var(--line);
+  box-shadow:var(--shadow);
+  display:grid;
+  justify-items:center;
+  gap:12px;
+  font-weight:850
+}
+.spinner {
+  width:30px;
+  height:30px;
+  border:4px solid #e4edf2;
+  border-top-color:var(--brand);
+  border-radius:50%;
+  animation:spin .8s linear infinite
+}
+@keyframes spin {
+  to {
+    transform:rotate(360deg)
+  }
+}
+@media(max-width:980px) {
+  .layout {
+    grid-template-columns:1fr
+  }
+  .sidebar {
+    position:static;
+    grid-template-columns:repeat(3,1fr)
+  }
+  .metrics {
+    grid-template-columns:repeat(2,1fr)
+  }
+  .split,.tool-form {
+    grid-template-columns:1fr
+  }
+}
+@media(max-width:620px) {
+  .shell {
+    padding:12px
+  }
+  .topbar,.section-head {
+    display:grid
+  }
+  .sidebar {
+    grid-template-columns:1fr 1fr
+  }
+  .metrics {
+    grid-template-columns:1fr
+  }
+  .setting-row {
+    grid-template-columns:1fr
+  }
+  .search-input {
+    width:100%
+  }
+  .toolbar .btn {
+    flex:1
+  }
+}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><small>青職同行</small><h1>管理者後台</h1><p>管理活力人、活力組、代禱事項、活動紀錄、積分紀錄與系統設定。</p></div>
+      <div class="toolbar"><button id="openAppBtn" class="btn" type="button">開啟前台</button><button id="logoutBtn" class="btn red hidden" type="button">登出後台</button></div>
+    </header>
+
+    <section id="loginView" class="panel login-card">
+      <h2>管理者登入</h2>
+      <label class="field">管理者登入密碼<input id="adminPasswordInput" type="password" placeholder="輸入管理者密碼"></label>
+      <button id="loginBtn" class="btn primary" type="button">登入</button>
+      <div id="loginMessage" class="message">請使用管理者密碼登入。首次遷移後請到設定頁更新密碼。</div>
+    </section>
+
+    <section id="appView" class="layout hidden">
+      <nav class="sidebar panel" aria-label="後台分頁">
+        <button class="tab-btn active" data-tab="overview" type="button">總覽</button>
+        <button class="tab-btn" data-tab="players" type="button">活力人</button>
+        <button class="tab-btn" data-tab="groups" type="button">活力組</button>
+        <button class="tab-btn" data-tab="cycles" type="button">週目</button>
+        <button class="tab-btn" data-tab="prayers" type="button">代禱</button>
+        <button class="tab-btn" data-tab="activityLogs" type="button">活動紀錄</button>
+        <button class="tab-btn" data-tab="rewardLogs" type="button">積分紀錄</button>
+        <button class="tab-btn" data-tab="chests" type="button">寶箱</button>
+        <button class="tab-btn" data-tab="settings" type="button">設定</button>
+      </nav>
+
+      <div class="content">
+        <section id="overviewTab" class="panel section">
+          <div class="section-head"><div><h2>系統總覽</h2><p id="overviewMeta">讀取中...</p></div><button class="btn primary" data-refresh="overview" type="button">更新總覽</button></div>
+          <div class="metrics">
+            <div class="metric"><span>活力人總數</span><strong id="metricPlayers">0</strong></div>
+            <div class="metric"><span>社青</span><strong id="metricSocialYoungPlayers">0</strong></div>
+            <div class="metric"><span>其他</span><strong id="metricOtherPlayers">0</strong></div>
+            <div class="metric"><span>活力組</span><strong id="metricGroups">0</strong></div>
+          </div>
+          <div class="split">
+            <section><h3>近期管理紀錄</h3><div id="recentAdminLogs" class="mini-list"></div></section>
+            <section><h3>待留意事項</h3><div id="attentionList" class="mini-list"></div></section>
+          </div>
+          <div id="overviewMessage" class="message"></div>
+        </section>
+
+        <section id="playersTab" class="panel section hidden">
+          <div class="section-head"><div><h2>活力人管理</h2><p>依出生年份自動分為：35 歲以下（含 35 歲）為社青；36 歲以上為其他。</p></div><button class="btn primary" data-refresh="players" type="button">更新活力人</button></div>
+          <div class="toolbar">
+            <input id="playerSearch" class="search-input" type="search" placeholder="搜尋姓名、帳號、照顧區、大區、活力組、ID">
+            <select id="playerAgeGroupFilter"><option value="all">全部年齡層</option><option value="社青">社青</option><option value="其他">其他</option><option value="未設定">未設定出生年</option></select>
+            <select id="playerStatusFilter"><option value="all">全部狀態</option><option value="active">啟用</option><option value="disabled">停用</option></select>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>活力人</th><th>年齡層</th><th>所屬</th><th>活力組</th><th>狀態</th><th>同行貢獻</th><th>登入</th><th>操作</th></tr></thead><tbody id="playersBody"></tbody></table></div>
+          <div id="playersMessage" class="message"></div>
+        </section>
+
+        <section id="groupsTab" class="panel section hidden">
+          <div class="section-head"><div><h2>活力組管理</h2><p>查看成員數、貢獻分數、邀請碼與啟用狀態。</p></div><button class="btn primary" data-refresh="groups" type="button">更新活力組</button></div>
+          <div class="toolbar"><input id="groupSearch" class="search-input" type="search" placeholder="搜尋組名、建立者、邀請碼"><select id="groupStatusFilter"><option value="all">全部活力組</option><option value="enabled">啟用</option><option value="disabled">停用</option></select></div>
+          <div class="table-wrap"><table><thead><tr><th>活力組</th><th>建立者</th><th>邀請碼</th><th>成員</th><th>貢獻</th><th>狀態</th><th>操作</th></tr></thead><tbody id="groupsBody"></tbody></table></div>
+          <div id="groupsMessage" class="message"></div>
+        </section>
+
+        <section id="cyclesTab" class="panel section hidden">
+          <div class="section-head"><div><h2>週目管理</h2><p>週目由活力人完成旅程後自行進入；後台僅檢視各活力人的目前週目與資料狀態。</p></div><button class="btn primary" data-refresh="cycles" type="button">更新週目</button></div>
+          <div id="cyclesCurrent" class="metrics"></div>
+          <div class="table-wrap"><table><thead><tr><th>週目</th><th>狀態</th><th>期間</th><th>備註</th></tr></thead><tbody id="cyclesBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>活力人</th><th>目前週目</th><th>目前活力組</th><th>狀態</th></tr></thead><tbody id="cyclePlayersBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>活力人</th><th>週目</th><th>歷史活力組</th><th>狀態</th><th>時間</th></tr></thead><tbody id="cycleMembershipsBody"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>週目</th><th>活力組</th><th>成員</th><th>狀態</th></tr></thead><tbody id="cycleGroupsBody"></tbody></table></div>
+          <div id="cyclesMessage" class="message"></div>
+        </section>
+
+        <section id="prayersTab" class="panel section hidden">
+          <div class="section-head"><div><h2>代禱管理</h2><p>檢視內容、恢復或關閉代禱事項。</p></div><button class="btn primary" data-refresh="prayers" type="button">更新代禱</button></div>
+          <div class="toolbar"><input id="prayerSearch" class="search-input" type="search" placeholder="搜尋標題、內容、發起者"><select id="prayerStatusFilter"><option value="all">全部狀態</option><option value="open">open</option><option value="closed">closed</option></select></div>
+          <div class="table-wrap"><table><thead><tr><th>代禱事項</th><th>發起者</th><th>活力組</th><th>狀態</th><th>可見</th><th>互動</th><th>時間</th><th>操作</th></tr></thead><tbody id="prayersBody"></tbody></table></div>
+          <div id="prayersMessage" class="message"></div>
+        </section>
+
+        <section id="activityLogsTab" class="panel section hidden">
+          <div class="section-head"><div><h2>活動紀錄</h2><p>查看管理者在系統中的操作紀錄。</p></div><button class="btn primary" data-refresh="activityLogs" type="button">更新活動紀錄</button></div>
+          <div id="activityAnalysis" class="metrics"></div>
+          <div class="split">
+            <section><h3>常見操作</h3><div id="activityTopActions" class="mini-list"></div></section>
+            <section><h3>常見目標</h3><div id="activityTopTargets" class="mini-list"></div></section>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>動作</th><th>目標</th><th>內容</th><th>時間</th></tr></thead><tbody id="adminLogsBody"></tbody></table></div>
+          <div id="activityLogsMessage" class="message"></div>
+        </section>
+
+        <section id="rewardLogsTab" class="panel section hidden">
+          <div class="section-head"><div><h2>積分紀錄</h2><p>查看活力人的積分與活力組旅程分數變動紀錄。</p></div><button class="btn primary" data-refresh="rewardLogs" type="button">更新積分紀錄</button></div>
+          <div id="rewardAnalysis" class="metrics"></div>
+          <div class="split">
+            <section><h3>活力人熱度</h3><div id="rewardTopPlayers" class="mini-list"></div></section>
+            <section><h3>小組進展</h3><div id="rewardTopGroups" class="mini-list"></div></section>
+          </div>
+          <div class="split">
+            <section><h3>來源分布</h3><div id="rewardSourceBreakdown" class="mini-list"></div></section>
+            <section><h3>近況趨勢</h3><div id="rewardDailyTrend" class="mini-list"></div></section>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>活力人</th><th>來源</th><th>分數</th><th>時間</th></tr></thead><tbody id="rewardLogsBody"></tbody></table></div>
+          <div id="rewardLogsMessage" class="message"></div>
+        </section>
+
+        <section id="chestsTab" class="panel section hidden">
+          <div class="section-head"><div><h2>寶箱設定</h2><p>設定週目寶箱名稱、獎勵方式、獎勵說明與小組點數。</p></div><button class="btn primary" data-refresh="chests" type="button">更新寶箱</button></div>
+          <div id="chestsList" class="settings-grid"></div>
+          <div id="chestsMessage" class="message"></div>
+        </section>
+
+        <section id="settingsTab" class="panel section hidden">
+          <div class="section-head">
+            <div>
+              <h2>系統設定</h2>
+              <p>此頁只顯示已登記、已接入系統的設定。名稱與積分會同步至既有使用者頁面；不會修改使用者頁面的版面或操作流程。</p>
+            </div>
+            <div class="toolbar">
+              <button id="normalizeSettingsBtn" class="btn amber" type="button">整理重複與無效設定</button>
+              <button class="btn primary" data-refresh="settings" type="button">更新設定</button>
+            </div>
+          </div>
+          <form id="adminPasswordForm" class="settings-grid" autocomplete="off">
+            <article class="setting-row">
+              <div>
+                <strong>管理者密碼</strong>
+                <small>使用 salt + SHA-256 儲存；修改後會讓既有後台登入狀態失效。</small>
+              </div>
+              <label class="field">目前密碼<input id="currentAdminPassword" type="password" autocomplete="current-password"></label>
+              <label class="field">新密碼<input id="newAdminPassword" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="8 至 64 碼"></label>
+              <label class="field">確認新密碼<input id="confirmAdminPassword" type="password" minlength="8" maxlength="64" autocomplete="new-password"></label>
+              <button class="btn primary" type="submit">更新管理者密碼</button>
+            </article>
+          </form>
+          <div id="settingsHealth" class="setting-health"></div>
+          <div id="settingsList" class="settings-grid"></div>
+          <div id="settingsMessage" class="message"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <div id="loading" class="loading hidden"><div class="loading-card"><div class="spinner"></div><span id="loadingText">處理中...</span></div></div>
+
+  <script src="server-client.js?v=20260714-github-v1"></script>
+  <script>
+    const ADMIN_STORAGE_KEY = 'yct_admin_token';
+    const state = {token:'',tab:'overview',players:[],groups:[],cycles:[],playerCycles:[],cycleMemberships:[],cycleGroups:[],currentCycle:null,prayers:[],adminLogs:[],rewardLogs:[],activityAnalysis:null,rewardAnalysis:null,chests:[],settings:[],settingsHealth:null};
+    const $ = (s) => document.querySelector(s);
+    const $$ = (s) => [...document.querySelectorAll(s)];
+
+    document.addEventListener('DOMContentLoaded', () => { bindEvents(); restoreSession(); });
+
+    function bindEvents(){
+      $('#openAppBtn').addEventListener('click', openFrontend);
+      $('#loginBtn').addEventListener('click', login);
+      $('#adminPasswordInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') login(); });
+      $('#logoutBtn').addEventListener('click', () => logout());
+      $$('.tab-btn').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+      $$('[data-refresh]').forEach((b) => b.addEventListener('click', () => loadTab(b.dataset.refresh, true)));
+      $('#playerSearch').addEventListener('input', renderPlayers);
+      $('#playerAgeGroupFilter').addEventListener('change', renderPlayers);
+      $('#playerStatusFilter').addEventListener('change', renderPlayers);
+      $('#groupSearch').addEventListener('input', renderGroups);
+      $('#groupStatusFilter').addEventListener('change', renderGroups);
+      $('#prayerSearch').addEventListener('input', renderPrayers);
+      $('#prayerStatusFilter').addEventListener('change', renderPrayers);
+      $('#playersBody').addEventListener('click', handlePlayerAction);
+      $('#groupsBody').addEventListener('click', handleGroupAction);
+      $('#prayersBody').addEventListener('click', handlePrayerAction);
+      $('#chestsList').addEventListener('click', handleChestAction);
+      $('#chestsList').addEventListener('change', handleChestRewardTypeChange);
+      $('#settingsList').addEventListener('click', handleSettingAction);
+      $('#normalizeSettingsBtn').addEventListener('click', normalizeManagedSettings);
+      $('#adminPasswordForm').addEventListener('submit', updateAdminPassword);
+    }
+
+    function restoreSession(){
+      const token = localStorage.getItem(ADMIN_STORAGE_KEY);
+      if(!token) return showLogin();
+      state.token = token;
+      showApp();
+      switchTab('overview');
+    }
+
+    function showLogin(){
+      $('#loginView').classList.remove('hidden');
+      $('#appView').classList.add('hidden');
+      $('#logoutBtn').classList.add('hidden');
+    }
+
+    function showApp(){
+      $('#loginView').classList.add('hidden');
+      $('#appView').classList.remove('hidden');
+      $('#logoutBtn').classList.remove('hidden');
+    }
+
+    function login(){
+      const password = $('#adminPasswordInput').value.trim();
+      if(!password) return showMessage('#loginMessage','請輸入管理者登入密碼','error');
+
+      setLoading(true,'登入中...');
+      callServer('adminLogin', password).then((res) => {
+        if(!isSuccess(res)) return showMessage('#loginMessage', responseError(res,'登入失敗'),'error');
+
+        state.token = res.data.adminToken || '';
+        localStorage.setItem(ADMIN_STORAGE_KEY,state.token);
+        showMessage(
+          '#loginMessage',
+          res.data.mustChangePassword
+            ? '登入成功。請到設定頁更新管理者密碼。'
+            : '登入成功',
+          'success'
+        );
+        showApp();
+        switchTab('overview');
+      }).catch((err) => showMessage('#loginMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function logout(message){
+      state.token = '';
+      localStorage.removeItem(ADMIN_STORAGE_KEY);
+      showLogin();
+      if(message) showMessage('#loginMessage',message,'error');
+    }
+
+    function openFrontend(){
+      window.location.href = 'index.html';
+    }
+
+    function switchTab(tab){
+      state.tab = tab;
+
+      $$('.tab-btn').forEach((b) => {
+        b.classList.toggle('active',b.dataset.tab === tab);
+      });
+
+      ['overview','players','groups','cycles','prayers','activityLogs','rewardLogs','chests','settings'].forEach((name) => {
+        $('#' + name + 'Tab').classList.toggle('hidden',name !== tab);
+      });
+
+      loadTab(tab,false);
+    }
+
+    function loadTab(tab,force){
+      const loaders = {
+        overview:loadOverview,
+        players:loadPlayers,
+        groups:loadGroups,
+        cycles:loadCycles,
+        prayers:loadPrayers,
+        activityLogs:loadActivityLogs,
+        rewardLogs:loadRewardLogs,
+        chests:loadChests,
+        settings:loadSettings
+      };
+
+      return loaders[tab] && loaders[tab](force);
+    }
+
+    function loadOverview(){
+      setLoading(true,'讀取總覽...');
+
+      Promise.all([
+        callServer('adminGetDashboardStats',state.token),
+        callServer('adminGetGroups',state.token),
+        callServer('adminGetActivityLogs',state.token,{limit:12})
+      ]).then(([statsRes,groupsRes,logsRes]) => {
+        if(!isSuccess(statsRes)) throw new Error(responseError(statsRes,'總覽讀取失敗'));
+        if(!isSuccess(groupsRes)) throw new Error(responseError(groupsRes,'活力組讀取失敗'));
+        if(!isSuccess(logsRes)) throw new Error(responseError(logsRes,'紀錄讀取失敗'));
+
+        const stats = statsRes.data || {};
+        state.groups = groupsRes.data.groups || [];
+        state.adminLogs = logsRes.data.adminLogs || [];
+
+        $('#metricPlayers').textContent = number(stats.playersTotal);
+        $('#metricSocialYoungPlayers').textContent = number(stats.socialYoungPlayers);
+        $('#metricOtherPlayers').textContent = number(stats.otherPlayers);
+        $('#metricGroups').textContent = number(state.groups.length);
+
+        $('#overviewMeta').textContent =
+          '本週：' + (stats.currentWeekKey || '-') +
+          '｜未設定出生年 ' + number(stats.unsetAgePlayers) +
+          '｜代禱開放中 ' + number(stats.openPrayerRequests);
+
+        renderMiniList('#recentAdminLogs',state.adminLogs,(r) => ({
+          title:r.adminAction + '｜' + r.targetType,
+          note:r.detail || r.targetId || '',
+          time:r.createdAt || ''
+        }));
+
+        renderMiniList('#attentionList',[
+          {title:'未設定出生年',note:'目前 ' + number(stats.unsetAgePlayers) + ' 位',time:''},
+          {title:'代禱開放中',note:'目前 ' + number(stats.openPrayerRequests) + ' 筆',time:''}
+        ],(r) => r);
+
+        showMessage('#overviewMessage','總覽已更新','success');
+      }).catch((err) => showMessage('#overviewMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function loadPlayers(force){
+      if(state.players.length && !force) return renderPlayers();
+
+      setLoading(true,'讀取活力人...');
+      callServer('adminGetPlayers',state.token).then((res) => {
+        if(!isSuccess(res)) return showMessage('#playersMessage',responseError(res,'讀取活力人失敗'),'error');
+
+        state.players = res.data.players || [];
+        renderPlayers();
+        showMessage('#playersMessage','已讀取 ' + state.players.length + ' 位活力人','success');
+      }).catch((err) => showMessage('#playersMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function renderPlayers(){
+      const key = normalize($('#playerSearch').value);
+      const status = $('#playerStatusFilter').value;
+      const ageGroup = $('#playerAgeGroupFilter').value;
+
+      const rows = state.players.filter((p) => {
+        const text = normalize([
+          p.playerName,
+          p.loginName,
+          p.playerId,
+          p.careDistrict,
+          p.careArea,
+          p.groupName,
+          p.groupId,
+          p.birthYear,
+          p.ageGroup,
+          p.status
+        ].join(' '));
+
+        return (!key || text.includes(key)) &&
+          (status === 'all' || p.status === status) &&
+          (ageGroup === 'all' || p.ageGroup === ageGroup);
+      });
+
+      $('#playersBody').innerHTML = rows.length ? rows.map((p) => {
+        const active = p.status === 'active';
+        const affiliation = [p.careDistrict,p.careArea].filter(Boolean).join('｜') || '-';
+        const age = p.age === '' || p.age == null
+          ? '出生年未設定'
+          : esc(p.birthYear) + '｜' + number(p.age) + ' 歲';
+
+        return '<tr>' +
+          '<td><div class="cell-main"><strong>' + esc(p.playerName) + '</strong><small>帳號：' + esc(p.loginName || '-') + '｜' + esc(p.playerId) + '</small></div></td>' +
+          '<td><div class="cell-main"><strong>' + esc(p.ageGroup || '未設定') + '</strong><small>' + age + '</small></div></td>' +
+          '<td>' + esc(affiliation) + '</td>' +
+          '<td><div class="cell-main"><strong>' + esc(p.groupName || '-') + '</strong><small>編號：' + esc(p.groupId || '-') + '</small></div></td>' +
+          '<td><span class="pill ' + esc(p.status) + '">' + (active ? '啟用' : '停用') + '</span></td>' +
+          '<td><strong>' + number(p.totalScore) + '</strong></td>' +
+          '<td>' + esc(p.lastLoginAt || '-') + '<br><small>失敗 ' + number(p.loginFailCount) + '</small></td>' +
+          '<td><div class="row-actions">' +
+            '<button class="btn small ' + (active ? 'red' : 'green') + '" data-action="player-status" data-player-id="' + esc(p.playerId) + '" data-status="' + (active ? 'disabled' : 'active') + '">' + (active ? '停用' : '啟用') + '</button>' +
+            '<button class="btn small amber" data-action="player-reset" data-player-id="' + esc(p.playerId) + '">重設碼</button>' +
+          '</div></td>' +
+        '</tr>';
+      }).join('') : '<tr><td colspan="8">沒有符合條件的活力人</td></tr>';
+    }
+
+    function handlePlayerAction(e){
+      const b = e.target.closest('button[data-action]');
+      if(!b) return;
+
+      if(b.dataset.action === 'player-status'){
+        updatePlayerStatus(b.dataset.playerId,b.dataset.status);
+      }
+
+      if(b.dataset.action === 'player-reset'){
+        resetPlayerPassword(b.dataset.playerId);
+      }
+    }
+
+    function updatePlayerStatus(playerId,status){
+      if(!confirm('確定要' + (status === 'active' ? '啟用' : '停用') + '這位活力人？')) return;
+
+      setLoading(true,'更新活力人狀態...');
+      callServer('adminUpdatePlayerStatus',state.token,{playerId,status}).then((res) => {
+        if(!isSuccess(res)) return showMessage('#playersMessage',responseError(res,'更新失敗'),'error');
+
+        state.players = [];
+        loadPlayers(true);
+      }).catch((err) => showMessage('#playersMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function resetPlayerPassword(playerId){
+      const code = prompt('輸入新的登入密碼（4-20字）');
+      if(!code || !code.trim()) return;
+
+      setLoading(true,'重設登入密碼...');
+      callServer('adminResetPlayerPassword',state.token,{
+        playerId,
+        newPasswordCode:code.trim()
+      }).then((res) => {
+        showMessage(
+          '#playersMessage',
+          isSuccess(res) ? '登入密碼已重設' : responseError(res,'重設失敗'),
+          isSuccess(res) ? 'success' : 'error'
+        );
+      }).catch((err) => showMessage('#playersMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function loadGroups(force){
+      if(state.groups.length && !force) return renderGroups();
+
+      setLoading(true,'讀取活力組...');
+      callServer('adminGetGroups',state.token).then((res) => {
+        if(!isSuccess(res)) return showMessage('#groupsMessage',responseError(res,'讀取活力組失敗'),'error');
+
+        state.groups = res.data.groups || [];
+        renderGroups();
+        showMessage('#groupsMessage','已讀取 ' + state.groups.length + ' 個活力組','success');
+      }).catch((err) => showMessage('#groupsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function renderGroups(){
+      const key = normalize($('#groupSearch').value);
+      const status = $('#groupStatusFilter').value;
+
+      const rows = state.groups.filter((g) => {
+        const matched = !key || normalize([
+          g.groupName,
+          g.ownerPlayerName,
+          g.inviteCode,
+          g.groupId
+        ].join(' ')).includes(key);
+
+        const statusMatched =
+          status === 'all' ||
+          (status === 'enabled' && g.enabled) ||
+          (status === 'disabled' && !g.enabled);
+
+        return matched && statusMatched;
+      });
+
+      $('#groupsBody').innerHTML = rows.length ? rows.map((g) => {
+        return '<tr>' +
+          '<td><div class="cell-main"><strong>' + esc(g.groupName) + '</strong><small>' + esc(g.groupId) + '</small></div></td>' +
+          '<td>' + esc(g.ownerPlayerName || '-') + '</td>' +
+          '<td><span class="pill">' + esc(g.inviteCode || '-') + '</span></td>' +
+          '<td>' + number(g.memberCount) + '</td>' +
+          '<td>旅程 ' + number(g.journeyScore) + '<br><small>活力人合計 ' + number(g.playerScoreTotal) + '</small></td>' +
+          '<td><span class="pill ' + (g.enabled ? 'enabled' : 'disabled') + '">' + (g.enabled ? '啟用' : '停用') + '</span></td>' +
+          '<td><div class="row-actions">' +
+            '<button class="btn small ' + (g.enabled ? 'red' : 'green') + '" data-action="group-enabled" data-group-id="' + esc(g.groupId) + '" data-enabled="' + (!g.enabled) + '">' + (g.enabled ? '停用' : '啟用') + '</button>' +
+            '<button class="btn small amber" data-action="group-invite" data-group-id="' + esc(g.groupId) + '">重發邀請碼</button>' +
+          '</div></td>' +
+        '</tr>';
+      }).join('') : '<tr><td colspan="7">沒有符合條件的活力組</td></tr>';
+    }
+
+    function handleGroupAction(e){
+      const b = e.target.closest('button[data-action]');
+      if(!b) return;
+
+      if(b.dataset.action === 'group-enabled'){
+        updateGroupEnabled(b.dataset.groupId,b.dataset.enabled === 'true');
+      }
+
+      if(b.dataset.action === 'group-invite'){
+        regenerateInvite(b.dataset.groupId);
+      }
+    }
+
+    function updateGroupEnabled(groupId,enabled){
+      if(!confirm('確定要' + (enabled ? '啟用' : '停用') + '這個活力組？')) return;
+
+      setLoading(true,'更新活力組...');
+      callServer('adminUpdateGroupEnabled',state.token,{groupId,enabled}).then((res) => {
+        if(!isSuccess(res)) return showMessage('#groupsMessage',responseError(res,'更新失敗'),'error');
+
+        state.groups = [];
+        loadGroups(true);
+      }).catch((err) => showMessage('#groupsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function regenerateInvite(groupId){
+      if(!confirm('確定要重新產生邀請碼？舊邀請碼會失效。')) return;
+
+      setLoading(true,'重新產生邀請碼...');
+      callServer('adminRegenerateGroupInviteCode',state.token,groupId).then((res) => {
+        if(!isSuccess(res)) return showMessage('#groupsMessage',responseError(res,'重發失敗'),'error');
+
+        state.groups = [];
+        loadGroups(true);
+        showMessage('#groupsMessage','新邀請碼：' + res.data.inviteCode,'success');
+      }).catch((err) => showMessage('#groupsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function loadPrayers(force){
+      if(state.prayers.length && !force) return renderPrayers();
+
+      setLoading(true,'讀取代禱...');
+      callServer('adminGetPrayerRequests',state.token).then((res) => {
+        if(!isSuccess(res)) return showMessage('#prayersMessage',responseError(res,'讀取代禱失敗'),'error');
+
+        state.prayers = res.data.requests || [];
+        renderPrayers();
+        showMessage('#prayersMessage','已讀取 ' + state.prayers.length + ' 筆代禱事項','success');
+      }).catch((err) => showMessage('#prayersMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function renderPrayers(){
+      const key = normalize($('#prayerSearch').value);
+      const status = $('#prayerStatusFilter').value;
+
+      const rows = state.prayers.filter((r) => {
+        const matched = !key || normalize([
+          r.title,
+          r.content,
+          r.ownerName,
+          r.groupName,
+          r.status,
+          r.visibility
+        ].join(' ')).includes(key);
+
+        return matched && (status === 'all' || r.status === status);
+      });
+
+      $('#prayersBody').innerHTML = rows.length ? rows.map((r) => {
+        return '<tr>' +
+          '<td><div class="cell-main"><strong>' + esc(r.title) + '</strong><small>' + esc(truncate(r.content,90)) + '</small></div></td>' +
+          '<td>' + esc(r.ownerName || '-') + '</td>' +
+          '<td>' + esc(r.groupName || '-') + '</td>' +
+          '<td><span class="pill ' + esc(r.status) + '">' + esc(r.status) + '</span></td>' +
+          '<td>' + esc(r.visibility || '-') + '</td>' +
+          '<td>回應 ' + number(r.responseCount) + '<br>代禱 ' + number(r.prayedCount) + '</td>' +
+          '<td>' + esc(r.createdAt || '-') + '</td>' +
+          '<td><div class="row-actions">' +
+            prayerButton(r,'open','恢復') +
+            prayerButton(r,'closed','關閉') +
+          '</div></td>' +
+        '</tr>';
+      }).join('') : '<tr><td colspan="8">沒有符合條件的代禱事項</td></tr>';
+    }
+
+    function prayerButton(r,status,label){
+      const color = status === 'closed' ? 'amber' : 'green';
+      return '<button class="btn small ' + color + '" data-action="prayer-status" data-request-id="' + esc(r.requestId) + '" data-status="' + status + '"' + (r.status === status ? ' disabled' : '') + '>' + label + '</button>';
+    }
+
+    function handlePrayerAction(e){
+      const b = e.target.closest('button[data-action]');
+      if(!b || b.dataset.action !== 'prayer-status') return;
+
+      updatePrayerStatus(b.dataset.requestId,b.dataset.status);
+    }
+
+    function updatePrayerStatus(requestId,status){
+      if(!confirm('確定要把代禱狀態改為 ' + status + '？')) return;
+
+      setLoading(true,'更新代禱狀態...');
+      callServer('adminUpdatePrayerStatus',state.token,{requestId,status}).then((res) => {
+        if(!isSuccess(res)) return showMessage('#prayersMessage',responseError(res,'更新失敗'),'error');
+
+        state.prayers = [];
+        loadPrayers(true);
+      }).catch((err) => showMessage('#prayersMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function loadActivityLogs(){
+      loadLogRecords('#activityLogsMessage','讀取活動紀錄...','活動紀錄已更新');
+    }
+
+    function loadRewardLogs(){
+      loadLogRecords('#rewardLogsMessage','讀取積分紀錄...','積分紀錄已更新');
+    }
+
+    function loadLogRecords(messageSelector,loadingText,successText){
+      setLoading(true,loadingText);
+
+      callServer('adminGetActivityLogs',state.token,{limit:100}).then((res) => {
+        if(!isSuccess(res)) return showMessage(messageSelector,responseError(res,'讀取紀錄失敗'),'error');
+
+        state.adminLogs = res.data.adminLogs || [];
+        state.rewardLogs = res.data.rewardLogs || [];
+        state.activityAnalysis = res.data.activityAnalysis || null;
+        state.rewardAnalysis = res.data.rewardAnalysis || null;
+
+        renderActivityLogs();
+        renderRewardLogs();
+        showMessage(messageSelector,successText,'success');
+      }).catch((err) => showMessage(messageSelector,errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function renderActivityAnalysis(){
+      const analysis = state.activityAnalysis || {};
+
+      $('#activityAnalysis').innerHTML =
+        '<div class="metric"><span>操作總數</span><strong>' + number(analysis.totalCount) + '</strong></div>' +
+        '<div class="metric"><span>近 7 日操作</span><strong>' + number(analysis.recent7DaysCount) + '</strong></div>' +
+        '<div class="metric"><span>操作種類</span><strong>' + number(analysis.actionTypeCount) + '</strong></div>' +
+        '<div class="metric"><span>最後操作</span><strong>' + esc(analysis.latestAt || '-').replace(/ /g,'<br>') + '</strong></div>';
+
+      renderMiniList('#activityTopActions',analysis.topActions || [],(row) => ({
+        title:row.name,
+        note:'共 ' + number(row.count) + ' 次',
+        time:''
+      }));
+
+      renderMiniList('#activityTopTargets',analysis.topTargets || [],(row) => ({
+        title:row.name,
+        note:'共 ' + number(row.count) + ' 次',
+        time:''
+      }));
+    }
+
+    function renderRewardAnalysis(){
+      const analysis = state.rewardAnalysis || {};
+
+      $('#rewardAnalysis').innerHTML =
+        '<div class="metric"><span>積分紀錄</span><strong>' + number(analysis.totalCount) + '</strong></div>' +
+        '<div class="metric"><span>貢獻點數</span><strong>' + number(analysis.totalScore) + '</strong></div>' +
+        '<div class="metric"><span>小組點數</span><strong>' + number(analysis.totalJourneyScore) + '</strong></div>' +
+        '<div class="metric"><span>近 7 日熱度</span><strong>' + number(analysis.recent7DaysScore) + '</strong></div>';
+
+      renderMiniList('#rewardTopPlayers',analysis.topPlayers || [],(row) => ({
+        title:row.name,
+        note:'小組 +' + number(row.journeyScore) + '｜貢獻 +' + number(row.totalScore) + '｜' + number(row.count) + ' 筆',
+        time:row.lastAt || ''
+      }));
+
+      renderMiniList('#rewardTopGroups',analysis.topGroups || [],(row) => ({
+        title:row.name,
+        note:'小組 +' + number(row.journeyScore) + '｜貢獻 +' + number(row.totalScore) + '｜' + number(row.count) + ' 筆',
+        time:''
+      }));
+
+      renderMiniList('#rewardSourceBreakdown',analysis.sourceBreakdown || [],(row) => ({
+        title:row.name,
+        note:number(row.count) + ' 筆｜小組 +' + number(row.journeyScore),
+        time:''
+      }));
+
+      renderMiniList('#rewardDailyTrend',analysis.dailyTrend || [],(row) => ({
+        title:row.name,
+        note:number(row.count) + ' 筆｜小組 +' + number(row.journeyScore),
+        time:''
+      }));
+    }
+
+    function renderActivityLogs(){
+      renderActivityAnalysis();
+
+      $('#adminLogsBody').innerHTML = state.adminLogs.length
+        ? state.adminLogs.map((l) =>
+          '<tr><td>' + esc(l.adminAction) + '</td>' +
+          '<td>' + esc(l.targetType) + '<br><small>' + esc(l.targetId) + '</small></td>' +
+          '<td>' + esc(l.detail) + '</td>' +
+          '<td>' + esc(l.createdAt) + '</td></tr>'
+        ).join('')
+        : '<tr><td colspan="4">尚無活動紀錄</td></tr>';
+    }
+
+    function renderRewardLogs(){
+      renderRewardAnalysis();
+
+      $('#rewardLogsBody').innerHTML = state.rewardLogs.length
+        ? state.rewardLogs.map((l) =>
+          '<tr><td>' + esc(l.playerName || l.playerId) + '<br><small>' + esc(l.groupName || '-') + '</small></td>' +
+          '<td>' + esc(l.sourceType) + '</td>' +
+          '<td>總分 ' + number(l.totalScore) + '<br><small>旅程 ' + number(l.journeyScore) + '</small></td>' +
+          '<td>' + esc(l.createdAt) + '</td></tr>'
+        ).join('')
+        : '<tr><td colspan="4">尚無積分紀錄</td></tr>';
+    }
+
+    function loadCycles(force){
+      if(state.cycles.length && !force) return renderCycles();
+
+      setLoading(true,'讀取週目資料...');
+      callServer('adminGetCycles',state.token).then((res) => {
+        if(!isSuccess(res)) return showMessage('#cyclesMessage',responseError(res,'讀取週目資料失敗'),'error');
+
+        state.cycles = res.data.cycles || [];
+        state.playerCycles = res.data.playerCycles || [];
+        state.cycleMemberships = res.data.cycleMemberships || [];
+        state.cycleGroups = res.data.cycleGroups || [];
+        renderCycles();
+        showMessage('#cyclesMessage','週目資料已更新','success');
+      }).catch((err) => showMessage('#cyclesMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function renderCycles(){
+      $('#cyclesCurrent').innerHTML = [
+        '<div class="metric"><span>週目數</span><strong>' + number(state.cycles.length) + '</strong></div>',
+        '<div class="metric"><span>活力人目前週目</span><strong>' + number(state.playerCycles.length) + '</strong></div>',
+        '<div class="metric"><span>模式</span><strong>個人週目</strong></div>'
+      ].join('');
+
+      $('#cyclesBody').innerHTML = state.cycles.length
+        ? state.cycles.map((cycle) => {
+          const period = [
+            cycle.startDate || '',
+            cycle.endDate || ''
+          ].filter(Boolean).join(' ~ ') || '-';
+          const status = cycle.status || '-';
+
+          return '<tr><td>' + esc(cycle.cycleName || cycle.cycleId || '-') + '<br><small>' + esc(cycle.cycleId || '') + '</small></td>' +
+            '<td>' + esc(status) + '</td>' +
+            '<td>' + esc(period) + '</td>' +
+            '<td>' + esc(cycle.notes || '') + '</td></tr>';
+        }).join('')
+        : '<tr><td colspan="4">目前沒有週目資料</td></tr>';
+
+      $('#cyclePlayersBody').innerHTML = state.playerCycles.length
+        ? state.playerCycles.map((row) => (
+          '<tr><td>' + esc(row.displayName || row.playerName || row.playerId || '-') + '<br><small>' + esc(row.playerId || '') + '</small></td>' +
+          '<td>' + esc(row.currentCycleName || row.currentCycleId || '-') + '<br><small>' + esc(row.currentCycleId || '') + '</small></td>' +
+          '<td>' + esc(row.groupName || '-') + '</td>' +
+          '<td>' + esc(row.status || '-') + '</td></tr>'
+        )).join('')
+        : '<tr><td colspan="4">目前沒有活力人週目資料</td></tr>';
+
+      $('#cycleMembershipsBody').innerHTML = state.cycleMemberships.length
+        ? state.cycleMemberships.map((row) => (
+          '<tr><td>' + esc(row.displayName || row.playerName || row.playerId || '-') + '<br><small>' + esc(row.playerId || '') + '</small></td>' +
+          '<td>' + esc(row.cycleName || row.cycleId || '-') + '<br><small>' + esc(row.cycleId || '') + '</small></td>' +
+          '<td>' + esc(row.groupName || row.groupId || '-') + '</td>' +
+          '<td>' + esc(row.status || '-') + '</td>' +
+          '<td>' + esc(row.joinedAt || '-') + '<br><small>' + esc(row.leftAt || '') + '</small></td></tr>'
+        )).join('')
+        : '<tr><td colspan="5">目前沒有週目歷史歸屬資料</td></tr>';
+
+      $('#cycleGroupsBody').innerHTML = state.cycleGroups.length
+        ? state.cycleGroups.map((row) => (
+          '<tr><td>' + esc(row.cycleName || row.cycleId || '-') + '<br><small>' + esc(row.cycleId || '') + '</small></td>' +
+          '<td>' + esc(row.groupName || row.groupId || '-') + '<br><small>' + esc(row.groupId || '') + '</small></td>' +
+          '<td>' + esc(row.membersText || '-') + '</td>' +
+          '<td>' + esc(row.enabled ? '啟用' : '停用') + '</td></tr>'
+        )).join('')
+        : '<tr><td colspan="4">目前沒有週目活力組資料</td></tr>';
+    }
+
+    function loadChests(force){
+      if(state.chests.length && !force) return renderChests();
+
+      setLoading(true,'讀取寶箱設定...');
+      callServer('adminGetChestSettings',state.token).then((res) => {
+        if(!isSuccess(res)) return showMessage('#chestsMessage',responseError(res,'讀取寶箱設定失敗'),'error');
+
+        state.chests = res.data.chests || [];
+        renderChests();
+        showMessage('#chestsMessage','寶箱設定已更新','success');
+      }).catch((err) => showMessage('#chestsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function renderChests(){
+      if(!state.chests.length){
+        $('#chestsList').innerHTML = '<div class="message">目前沒有寶箱設定</div>';
+        return;
+      }
+
+      $('#chestsList').innerHTML = state.chests.map((chest) => {
+        const chestId = chest.chestId || '';
+        const rewardType = chest.rewardType === 'groupPoints' ? 'groupPoints' : 'other';
+        const pointsField =
+          '<label class="field' + (rewardType === 'groupPoints' ? '' : ' hidden') + '" data-chest-points-wrap="' + esc(chestId) + '">小組點數<input type="number" min="0" step="1" value="' + esc(chest.groupBonusPoints || 0) + '" data-chest-points="' + esc(chestId) + '"></label>';
+
+        return '<section class="setting-row">' +
+          '<div class="setting-meta chest-setting-preview">' +
+            '<img src="' + esc(chest.imageUrl || '') + '" alt="">' +
+            '<div><strong>' + esc(chest.chestId || '') + '</strong><p>' + esc(chest.stationKey ? '站點：' + chest.stationKey : '加入活力組取得') + '</p></div>' +
+          '</div>' +
+          '<div class="chest-setting-fields">' +
+            '<label class="field">寶箱名稱<input type="text" value="' + esc(chest.chestName || '') + '" data-chest-name="' + esc(chestId) + '"></label>' +
+            '<label class="field">獎勵方式<select data-chest-reward-type="' + esc(chestId) + '">' +
+              '<option value="groupPoints"' + (rewardType === 'groupPoints' ? ' selected' : '') + '>小組點數</option>' +
+              '<option value="other"' + (rewardType === 'other' ? ' selected' : '') + '>其他</option>' +
+            '</select></label>' +
+            '<label class="field">獎勵說明<input type="text" value="' + esc(chest.rewardDescription || '') + '" data-chest-description="' + esc(chestId) + '"></label>' +
+            pointsField +
+          '</div>' +
+          '<button class="btn small primary" data-action="chest-save" data-chest-id="' + esc(chestId) + '">儲存</button>' +
+        '</section>';
+      }).join('');
+    }
+
+    function handleChestAction(e){
+      const b = e.target.closest('button[data-action="chest-save"]');
+      if(!b) return;
+
+      const chestId = b.dataset.chestId || '';
+      const nameInput = document.querySelector('input[data-chest-name="' + cssEscape(chestId) + '"]');
+      const descriptionInput = document.querySelector('input[data-chest-description="' + cssEscape(chestId) + '"]');
+      const rewardTypeInput = document.querySelector('select[data-chest-reward-type="' + cssEscape(chestId) + '"]');
+      const pointsInput = document.querySelector('input[data-chest-points="' + cssEscape(chestId) + '"]');
+
+      setLoading(true,'儲存寶箱設定...');
+      callServer('adminUpdateChestSetting',state.token,{
+        chestId,
+        chestName:nameInput ? nameInput.value : '',
+        rewardDescription:descriptionInput ? descriptionInput.value : '',
+        rewardType:rewardTypeInput ? rewardTypeInput.value : 'other',
+        groupBonusPoints:pointsInput ? pointsInput.value : 0
+      }).then((res) => {
+        if(!isSuccess(res)) return showMessage('#chestsMessage',responseError(res,'儲存寶箱設定失敗'),'error');
+
+        state.chests = [];
+        loadChests(true);
+      }).catch((err) => showMessage('#chestsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function handleChestRewardTypeChange(e){
+      const select = e.target.closest('select[data-chest-reward-type]');
+      if(!select) return;
+
+      const chestId = select.dataset.chestRewardType || '';
+      const pointsWrap = document.querySelector('[data-chest-points-wrap="' + cssEscape(chestId) + '"]');
+
+      if(pointsWrap){
+        pointsWrap.classList.toggle('hidden', select.value !== 'groupPoints');
+      }
+    }
+
+    function loadSettings(force){
+      if(state.settings.length && !force) return renderSettings();
+
+      setLoading(true,'讀取正式系統設定...');
+      callServer('adminGetManagedSystemSettings',state.token).then((res) => {
+        if(!isSuccess(res)) return showMessage('#settingsMessage',responseError(res,'讀取設定失敗'),'error');
+
+        state.settings = res.data.settings || [];
+        state.settingsHealth = res.data.health || null;
+        renderSettings();
+        showMessage('#settingsMessage','設定已更新','success');
+      }).catch((err) => showMessage('#settingsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function renderSettings(){
+      renderSettingsHealth();
+
+      if(!state.settings.length){
+        $('#settingsList').innerHTML = '<div class="message">沒有已登記的系統設定</div>';
+        return;
+      }
+
+      const groups = {};
+      state.settings.forEach((setting) => {
+        const category = setting.category || '其他設定';
+        if(!groups[category]) groups[category] = [];
+        groups[category].push(setting);
+      });
+
+      $('#settingsList').innerHTML = Object.keys(groups).map((category) => {
+        const rows = groups[category].map(renderManagedSettingRow).join('');
+        return '<section class="setting-category">' +
+          '<h3>' + esc(category) + '</h3>' +
+          rows +
+        '</section>';
+      }).join('');
+    }
+
+    function renderManagedSettingRow(setting){
+      const type = setting.inputType === 'number' ? 'number' : setting.inputType === 'password' ? 'password' : 'text';
+      const min = setting.min == null ? '' : ' min="' + esc(setting.min) + '"';
+      const max = setting.max == null ? '' : ' max="' + esc(setting.max) + '"';
+      const minLength = setting.minLength == null ? '' : ' minlength="' + esc(setting.minLength) + '"';
+      const maxLength = setting.maxLength == null ? '' : ' maxlength="' + esc(setting.maxLength) + '"';
+      const step = type === 'number' ? ' step="1"' : '';
+      const target = setting.target ? '<span class="setting-target">影響：' + esc(setting.target) + '</span>' : '';
+
+      return '<div class="setting-row">' +
+        '<div class="setting-meta">' +
+          '<strong>' + esc(setting.label) + '</strong>' +
+          '<p>' + esc(setting.note || '') + '</p>' +
+          target +
+          '<small>' + esc(setting.key) + '</small>' +
+        '</div>' +
+        '<input type="' + type + '" value="' + esc(setting.value || '') + '" data-setting-value="' + esc(setting.key) + '"' + min + max + minLength + maxLength + step + '>' +
+        '<button class="btn small primary" data-action="setting-save" data-key="' + esc(setting.key) + '">儲存</button>' +
+      '</div>';
+    }
+
+    function renderSettingsHealth(){
+      const health = state.settingsHealth;
+      const target = $('#settingsHealth');
+
+      if(!health){
+        target.className = 'setting-health';
+        target.innerHTML = '';
+        return;
+      }
+
+      const duplicate = health.duplicateKeys || [];
+      const invalid = health.invalidSettings || [];
+      const missing = health.missingKeys || [];
+      const unknown = health.unknownKeys || [];
+      const messages = [];
+
+      if(duplicate.length) messages.push('重複 key：' + duplicate.map((item) => item.key + ' ×' + item.count).join('、'));
+      if(invalid.length) messages.push('格式不正確：' + invalid.map((item) => item.key + '（' + item.error + '）').join('、'));
+      if(missing.length) messages.push('缺少設定：' + missing.join('、'));
+      if(unknown.length) messages.push('未被系統使用：' + unknown.map((item) => item.key).join('、'));
+
+      if(!messages.length){
+        target.className = 'setting-health is-healthy';
+        target.innerHTML = '<article class="mini-item"><strong>設定對應正常</strong><small>目前設定頁中的每一項都已接入首頁顯示、任務確認視窗、歷史紀錄或實際積分計算。</small></article>';
+        return;
+      }
+
+      target.className = 'setting-health has-issues';
+      target.innerHTML = '<article class="mini-item"><strong>偵測到 ' + number(health.issueCount || messages.length) + ' 個設定問題</strong><small>' + esc(messages.join('\n')) + '</small><small>按「整理重複與無效設定」後，系統會保留最新有效值、補齊缺少 key，並移除未被系統使用的設定列。</small></article>';
+    }
+
+    function handleSettingAction(e){
+      const b = e.target.closest('button[data-action="setting-save"]');
+      if(!b) return;
+
+      const key = b.dataset.key;
+      const input = document.querySelector('input[data-setting-value="' + cssEscape(key) + '"]');
+      if(!input) return;
+
+      setLoading(true,'儲存設定...');
+      callServer('adminUpdateManagedSystemSetting',state.token,{key,value:input.value}).then((res) => {
+        if(!isSuccess(res)) return showMessage('#settingsMessage',responseError(res,'儲存失敗'),'error');
+
+        state.settings = [];
+        state.settingsHealth = null;
+        loadSettings(true);
+      }).catch((err) => showMessage('#settingsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function updateAdminPassword(event){
+      event.preventDefault();
+
+      const currentPassword = $('#currentAdminPassword').value.trim();
+      const newPassword = $('#newAdminPassword').value.trim();
+      const confirmPassword = $('#confirmAdminPassword').value.trim();
+
+      if(!currentPassword || !newPassword || !confirmPassword){
+        showMessage('#settingsMessage','請完整輸入目前密碼、新密碼與確認新密碼','error');
+        return;
+      }
+
+      if(newPassword !== confirmPassword){
+        showMessage('#settingsMessage','兩次輸入的新密碼不一致','error');
+        return;
+      }
+
+      if(newPassword.length < 8 || newPassword.length > 64){
+        showMessage('#settingsMessage','新管理者密碼需為 8 至 64 碼','error');
+        return;
+      }
+
+      setLoading(true,'更新管理者密碼...');
+      callServer('adminUpdateAdminPassword',state.token,{
+        currentPassword,
+        newPassword
+      }).then((res) => {
+        if(!isSuccess(res)) return showMessage('#settingsMessage',responseError(res,'更新管理者密碼失敗'),'error');
+
+        $('#currentAdminPassword').value = '';
+        $('#newAdminPassword').value = '';
+        $('#confirmAdminPassword').value = '';
+        logout(res.data.message || '管理者密碼已更新，請重新登入。');
+      }).catch((err) => showMessage('#settingsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function normalizeManagedSettings(){
+      const health = state.settingsHealth || {};
+      const issueCount = Number(health.issueCount || 0);
+
+      if(!issueCount){
+        showMessage('#settingsMessage','目前沒有重複、失效或未使用的設定需要整理','success');
+        return;
+      }
+
+      if(!confirm('確定整理 SystemSettings？\n\n系統會：\n1. 保留每個正式設定 key 的最新有效值。\n2. 補齊缺少的正式設定。\n3. 將格式錯誤的值重設為系統預設值。\n4. 刪除重複列與未被系統使用的設定列。')) return;
+
+      setLoading(true,'整理系統設定...');
+      callServer('adminNormalizeManagedSystemSettings',state.token).then((res) => {
+        if(!isSuccess(res)) return showMessage('#settingsMessage',responseError(res,'整理失敗'),'error');
+
+        state.settings = res.data && res.data.payload ? res.data.payload.settings || [] : [];
+        state.settingsHealth = res.data && res.data.payload ? res.data.payload.health || null : null;
+        renderSettings();
+
+        const result = res.data && res.data.result ? res.data.result : {};
+        showMessage('#settingsMessage','設定已整理：新增 ' + number(result.createdCount) + '、移除重複 ' + number(result.removedDuplicateCount) + '、移除未使用 ' + number(result.removedUnknownCount) + '、重設失效值 ' + number(result.resetInvalidCount),'success');
+      }).catch((err) => showMessage('#settingsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function renderMiniList(selector,rows,mapper){
+      const target = $(selector);
+
+      target.innerHTML = rows.length
+        ? rows.map((row) => {
+          const item = mapper(row);
+          return '<article class="mini-item"><strong>' + esc(item.title || '') + '</strong><small>' + esc(item.note || '') + '</small><small>' + esc(item.time || '') + '</small></article>';
+        }).join('')
+        : '<div class="mini-item"><strong>目前沒有資料</strong></div>';
+    }
+
+    function callServer(functionName,...args){
+      return window.GasBackend.invoke(functionName,args).then((res) => {
+        if(functionName !== 'adminLogin' && isAuthError(res && res.error)){
+          logout(res.error);
+          throw new Error(res.error);
+        }
+
+        return res;
+      });
+    }
+
+    function setLoading(active,text){
+      $('#loading').classList.toggle('hidden',!active);
+      $('#loadingText').textContent = text || '處理中...';
+    }
+
+    function showMessage(selector,text,type){
+      const box = $(selector);
+      box.textContent = text || '';
+      box.classList.remove('success','error');
+      if(type) box.classList.add(type);
+    }
+
+    function isSuccess(res){ return !!(res && res.success); }
+    function responseError(res,fallback){ return res && res.error ? res.error : fallback; }
+    function errorMessage(err){ return typeof err === 'string' ? err : err && err.message ? err.message : '系統錯誤'; }
+    function isAuthError(message){ return String(message || '').includes('管理') && String(message || '').includes('登入'); }
+    function normalize(value){ return String(value || '').trim().toLowerCase(); }
+    function number(value){ return Number(value || 0).toLocaleString('zh-Hant-TW'); }
+    function truncate(value,max){ value = String(value || ''); return value.length > max ? value.slice(0,max) + '...' : value; }
+    function cssEscape(value){ return window.CSS && CSS.escape ? CSS.escape(value) : String(value || '').replace(/"/g,'\\"'); }
+    function esc(value){
+      return String(value == null ? '' : value)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#039;');
+    }
+  </script>
+</body>
+</html>
