@@ -177,8 +177,7 @@ button:disabled{
 }
 
 .result-box,
-.message-box,
-.mini-result{
+.message-box{
   border-radius:14px;
   padding:11px 12px;
   margin-top:12px;
