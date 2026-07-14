@@ -23,15 +23,31 @@
         <section class="auth-card">
           <h2>登入旅程</h2>
 
-          <form id="loginForm" class="form-stack">
+          <form id="loginForm" class="form-stack" autocomplete="off">
             <label class="field-label">
               帳號或姓名
-              <input id="loginName" type="text" autocomplete="username" placeholder="請輸入帳號或姓名">
+              <input
+                id="loginName"
+                name="login-account-input"
+                type="text"
+                autocomplete="off"
+                autocapitalize="none"
+                spellcheck="false"
+                readonly
+                placeholder="請輸入帳號或姓名"
+              >
             </label>
 
             <label class="field-label">
               登入密碼
-              <input id="loginPassword" type="password" autocomplete="current-password" placeholder="請輸入登入密碼">
+              <input
+                id="loginPassword"
+                name="login-password-input"
+                type="password"
+                autocomplete="new-password"
+                readonly
+                placeholder="請輸入登入密碼"
+              >
             </label>
 
             <button class="primary-btn" type="submit">進入旅程</button>
@@ -970,6 +986,52 @@
       <span id="loadingText">處理中...</span>
     </div>
   </div>
+
+  <script>
+    (() => {
+      const LOGIN_FIELD_IDS = ["loginName", "loginPassword"];
+
+      function getLoginFields() {
+        return LOGIN_FIELD_IDS
+          .map((id) => document.getElementById(id))
+          .filter(Boolean);
+      }
+
+      function clearLockedLoginFields() {
+        getLoginFields().forEach((field) => {
+          if (field.hasAttribute("readonly")) {
+            field.value = "";
+          }
+        });
+      }
+
+      function unlockLoginField(event) {
+        const field = event.currentTarget;
+        field.removeAttribute("readonly");
+        field.value = "";
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        getLoginFields().forEach((field) => {
+          field.value = "";
+          field.setAttribute("readonly", "");
+
+          field.addEventListener("focus", unlockLoginField, { once: true });
+          field.addEventListener("pointerdown", unlockLoginField, { once: true });
+        });
+
+        clearLockedLoginFields();
+        window.setTimeout(clearLockedLoginFields, 100);
+        window.setTimeout(clearLockedLoginFields, 500);
+      });
+
+      window.addEventListener("pageshow", () => {
+        clearLockedLoginFields();
+        window.setTimeout(clearLockedLoginFields, 100);
+        window.setTimeout(clearLockedLoginFields, 500);
+      });
+    })();
+  </script>
 
   <script src="server-client.js?v=20260714-github-v1"></script>
   <script src="script.js?v=20260714-github-v1"></script>
