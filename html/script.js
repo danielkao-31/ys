@@ -839,8 +839,7 @@ const STORAGE_KEY = 'yct_current_player';
     callServer('loginPlayer', playerName, passwordCode)
       .then((res) => {
         if (!isSuccess(res)) {
-          setLoading(false);
-          showAuthMessage(getResponseError(res, '登入失敗'));
+          handleLoginFailure_(res);
           return null;
         }
 
@@ -872,6 +871,71 @@ const STORAGE_KEY = 'yct_current_player';
         showAuthMessage(getErrorMessage(error));
         setLoading(false);
       });
+  }
+
+  function handleLoginFailure_(res) {
+    const code = String(res && res.code || '').trim();
+    const loginNameField = $('#loginName');
+    const passwordField = $('#loginPassword');
+
+    setLoading(false);
+    showAuthMessage(getLoginErrorMessage_(res));
+
+    if (passwordField) {
+      passwordField.value = '';
+    }
+
+    window.setTimeout(() => {
+      const shouldFocusPassword = code === 'PASSWORD_INCORRECT';
+      const target = shouldFocusPassword
+        ? passwordField
+        : loginNameField;
+
+      if (!target) {
+        return;
+      }
+
+      target.removeAttribute('readonly');
+      target.focus();
+
+      if (!shouldFocusPassword && typeof target.select === 'function') {
+        target.select();
+      }
+    }, 0);
+  }
+
+  function getLoginErrorMessage_(res) {
+    const code = String(res && res.code || '').trim();
+    const data = res && res.data ? res.data : {};
+
+    if (code === 'ACCOUNT_NOT_FOUND') {
+      return '找不到此帳號或姓名，請確認輸入是否正確。';
+    }
+
+    if (code === 'AMBIGUOUS_NAME') {
+      return '此姓名有多位使用者，請改用登入帳號。';
+    }
+
+    if (code === 'PASSWORD_INCORRECT') {
+      const remainingAttempts = Number(data.remainingAttempts);
+
+      return remainingAttempts > 0
+        ? '登入密碼錯誤，剩餘可嘗試次數：' + remainingAttempts
+        : '登入密碼錯誤，請重新輸入。';
+    }
+
+    if (code === 'ACCOUNT_DISABLED') {
+      return '此帳號已停用，請聯絡管理者。';
+    }
+
+    if (code === 'ACCOUNT_LOCKED') {
+      return getResponseError(
+        res,
+        '登入錯誤次數過多，請稍後再試。'
+      );
+    }
+
+    return getResponseError(res, '登入失敗');
   }
 
   function initRegisterAvatar() {
