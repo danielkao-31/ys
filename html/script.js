@@ -493,8 +493,7 @@ const STORAGE_KEY = 'yct_current_player';
       'change',
       handleRegisterCareDistrictChange
     );
-    $('#pingBtn').addEventListener('click', testPing);
-
+    
     $('#registerAvatarGender').addEventListener('change', randomizeRegisterAvatar);
     $('#registerPrevAvatarBtn').addEventListener('click', () => stepRegisterAvatar(-1));
     $('#registerRandomAvatarBtn').addEventListener('click', randomizeRegisterAvatar);
@@ -4622,27 +4621,6 @@ function clearPrayerAutoScroll(selector) {
     clearAllAppCache_();
 
     localStorage.removeItem(STORAGE_KEY);
-  }
-
-  function testPing() {
-    $('#pingResult').classList.remove('hidden');
-    $('#pingResult').textContent = '正在連接 GAS 後端...';
-
-    callServer('ping')
-      .then((res) => {
-        $('#pingResult').textContent =
-          res && res.ok
-            ? '狀態：' +
-              res.message +
-              '\n伺服器時間：' +
-              res.serverTime
-            : '連線失敗：後端沒有回傳正確結果';
-      })
-      .catch((error) => {
-        $('#pingResult').textContent =
-          '連線錯誤：' +
-          getErrorMessage(error);
-      });
   }
 
   function openInfoModal(title, html) {
