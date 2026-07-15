@@ -5177,7 +5177,7 @@ function clearPrayerAutoScroll(selector) {
   function getAvatarMaxNo(gender) {
     return normalizeAvatarGender(gender) === 'female'
       ? 100
-      : 90;
+      : 80;
   }
 
   function getAvatarUrl(gender, no) {
