@@ -1,11 +1,19 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <base target="_top">
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <link rel="icon" type="image/png" href="../UI/app-icon.png">
+  <link rel="apple-touch-icon" href="../UI/app-icon.png">
+  <link rel="manifest" href="manifest.webmanifest?v=20260724-github-v01321">
+<meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="高雄青職｜活力同行">
+  <meta name="application-name" content="高雄青職｜活力同行">
+  <meta name="theme-color" content="#8fd3ff">
   <title>高雄青職｜活力同行</title>
-  <link rel="stylesheet" href="style.css?v=20260715-avatar-v1">
+  <link rel="stylesheet" href="style.css?v=20260724-github-v01321">
 </head>
 <body>
   <div class="app-shell">
@@ -23,31 +31,15 @@
         <section class="auth-card">
           <h2>登入旅程</h2>
 
-          <form id="loginForm" class="form-stack" autocomplete="off">
+          <form id="loginForm" class="form-stack">
             <label class="field-label">
-              帳號或姓名
-              <input
-                id="loginName"
-                name="login-account-input"
-                type="text"
-                autocomplete="off"
-                autocapitalize="none"
-                spellcheck="false"
-                readonly
-                placeholder="請輸入帳號或姓名"
-              >
+              登入帳號
+              <input id="loginName" type="text" autocomplete="username" placeholder="請輸入登入帳號">
             </label>
 
             <label class="field-label">
               登入密碼
-              <input
-                id="loginPassword"
-                name="login-password-input"
-                type="password"
-                autocomplete="new-password"
-                readonly
-                placeholder="請輸入登入密碼"
-              >
+              <input id="loginPassword" type="password" autocomplete="current-password" placeholder="請輸入登入密碼">
             </label>
 
             <button class="primary-btn" type="submit">進入旅程</button>
@@ -57,10 +49,6 @@
             新活力人註冊
           </button>
 
-          <button id="openPasswordResetBtn" class="text-btn" type="button">
-            忘記登入密碼？
-          </button>
-
           <div id="authMessage" class="message-box hidden"></div>
         </section>
       </section>
@@ -68,9 +56,16 @@
       <!-- 首頁 -->
       <section id="homeView" class="view-screen hidden">
         <header class="app-topbar">
-          <button id="homeAvatarBtn" class="top-avatar-btn" type="button" aria-label="更換頭像">
+          <button id="homeAvatarBtn" class="top-avatar-btn" type="button" aria-label="開啟訊息中心">
             <img id="homeAvatarImg" class="top-avatar-img hidden" alt="活力人頭像">
             <span id="homeAvatarPlaceholder">?</span>
+            <span id="homeMessageBadge" class="home-message-badge" aria-label="開啟訊息中心">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 6.5v7"></path>
+                <circle cx="12" cy="17.5" r="1"></circle>
+              </svg>
+            </span>
           </button>
 
           <div class="topbar-player">
@@ -212,8 +207,8 @@
 
               <button id="homeMorningBtn" class="quest-card" type="button" data-practice="morning">
                 <span class="quest-icon">晨</span>
-                <strong>小組晨興</strong>
-                <small>貢獻 +20</small>
+                <strong>任務</strong>
+                <small>—</small>
                 <em id="homeMorningStatus">未完成</em>
               </button>
             </section>
@@ -224,22 +219,22 @@
               <div class="personal-task-card-row">
                 <button id="homeBibleBtn" class="quest-card" type="button" data-practice="bible">
                   <span class="quest-icon">讀</span>
-                  <strong>個人讀經</strong>
-                  <small>貢獻 +30</small>
+                  <strong>任務</strong>
+                  <small>—</small>
                   <em id="homeBibleStatus">未完成</em>
                 </button>
 
                 <button id="homePrayerPracticeBtn" class="quest-card" type="button" data-practice="prayer">
                   <span class="quest-icon">禱</span>
-                  <strong>個人禱告</strong>
-                  <small>貢獻 +20</small>
+                  <strong>任務</strong>
+                  <small>—</small>
                   <em id="homePrayerPracticeStatus">未完成</em>
                 </button>
 
                 <button id="homeBookBtn" class="quest-card" type="button" data-practice="book">
                   <span class="quest-icon">書</span>
-                  <strong>書報追求</strong>
-                  <small>貢獻 +30</small>
+                  <strong>任務</strong>
+                  <small>—</small>
                   <em id="homeBookStatus">未完成</em>
                 </button>
               </div>
@@ -264,8 +259,8 @@
 
               <button id="homeOutreachVisitBtn" class="quest-card" type="button" data-weekly-task="outreachVisit">
                 <span class="quest-icon">訪</span>
-                <strong>外出探訪</strong>
-                <small>貢獻 +50</small>
+                <strong>任務</strong>
+                <small>—</small>
                 <em id="homeOutreachVisitStatus">未完成</em>
               </button>
             </section>
@@ -276,22 +271,22 @@
               <div class="personal-task-card-row">
                 <button id="homeWeeklySmallGroupBtn" class="quest-card" type="button" data-weekly-task="smallGroup">
                   <span class="quest-icon">小</span>
-                  <strong>小排聚會</strong>
-                  <small>貢獻 +40</small>
+                  <strong>任務</strong>
+                  <small>—</small>
                   <em id="homeWeeklySmallGroupStatus">未完成</em>
                 </button>
 
                 <button id="homeWeeklyPrayerMeetingBtn" class="quest-card" type="button" data-weekly-task="prayerMeeting">
                   <span class="quest-icon">禱</span>
-                  <strong>禱告聚會</strong>
-                  <small>貢獻 +40</small>
+                  <strong>任務</strong>
+                  <small>—</small>
                   <em id="homeWeeklyPrayerMeetingStatus">未完成</em>
                 </button>
 
                 <button id="homeWeeklyLordDayBtn" class="quest-card" type="button" data-weekly-task="lordDayMeeting">
                   <span class="quest-icon">主</span>
-                  <strong>主日聚會</strong>
-                  <small>貢獻 +50</small>
+                  <strong>任務</strong>
+                  <small>—</small>
                   <em id="homeWeeklyLordDayStatus">未完成</em>
                 </button>
               </div>
@@ -310,13 +305,13 @@
 
           <div class="gateway-grid">
             <button id="goPrayerBtn" class="gateway-card prayer-gateway" type="button">
-              <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C/svg%3E" data-managed-url="../UI/icon-prayer-link.png" data-image-key="iconPrayerLink" alt="">
+              <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C/svg%3E" data-managed-url="https://raw.githubusercontent.com/danielkao-31/ys/main/UI/icon-prayer-link.png" data-image-key="iconPrayerLink" alt="">
               <strong>代禱交通</strong>
               <span id="gatewayPrayerText">守望同伴</span>
             </button>
 
             <button id="goMyBtn" class="gateway-card journey-gateway" type="button">
-              <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C/svg%3E" data-managed-url="../UI/icon-growth.png" data-image-key="iconGrowth" alt="">
+              <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C/svg%3E" data-managed-url="https://raw.githubusercontent.com/danielkao-31/ys/main/UI/icon-growth.png" data-image-key="iconGrowth" alt="">
               <strong>我的足跡</strong>
               <span>貢獻與紀錄</span>
             </button>
@@ -432,48 +427,6 @@
     </nav>
   </div>
 
-  <!-- 忘記登入密碼 -->
-  <div id="passwordResetModal" class="modal-layer hidden" role="dialog" aria-modal="true">
-    <div class="modal-card">
-      <div class="modal-header">
-        <button class="modal-close-btn" data-close-modal="passwordResetModal" type="button">‹</button>
-        <h2>忘記登入密碼</h2>
-        <span></span>
-      </div>
-
-      <form id="passwordResetForm" class="form-stack">
-        <label class="field-label">
-          登入帳號
-          <input id="passwordResetLoginName" type="text" autocomplete="username" placeholder="請輸入登入帳號">
-        </label>
-
-        <label class="field-label">
-          顯示名稱
-          <input id="passwordResetName" type="text" autocomplete="name" placeholder="請輸入註冊顯示名稱">
-        </label>
-
-        <label class="field-label">
-          出生年
-          <input id="passwordResetBirthYear" type="number" inputmode="numeric" placeholder="例如：1998">
-        </label>
-
-        <label class="field-label">
-          新登入密碼
-          <input id="passwordResetNewPassword" type="password" autocomplete="new-password" placeholder="請設定 4 至 20 碼登入密碼">
-        </label>
-
-        <section class="confirm-info-card">
-          <strong>核對資料後自行重設</strong>
-          <p>帳號、顯示名稱與出生年都正確時，系統會直接更新登入密碼。</p>
-        </section>
-
-        <button class="primary-btn" type="submit">重設登入密碼</button>
-      </form>
-
-      <div id="passwordResetMessage" class="result-box hidden"></div>
-    </div>
-  </div>
-
   <!-- 註冊 -->
   <div id="registerModal" class="modal-layer hidden" role="dialog" aria-modal="true">
     <div class="modal-card large-modal-card">
@@ -527,7 +480,7 @@
         </label>
 
         <section class="avatar-picker-card">
-          <img id="registerAvatarPreview" class="avatar-preview-img" alt="">
+          <img id="registerAvatarPreview" class="avatar-preview-img" alt="頭像預覽">
 
           <div>
             <strong id="registerAvatarInfo">尚未選擇</strong>
@@ -546,7 +499,55 @@
     </div>
   </div>
 
-  <!-- 頭像 -->
+  <!-- 訊息中心 -->
+  <div id="messageCenterModal" class="modal-layer hidden" role="dialog" aria-modal="true" aria-labelledby="messageCenterTitle">
+    <div class="modal-card wide-modal-card message-center-card">
+      <div class="modal-header">
+        <button id="refreshMessageCenterBtn" class="mini-outline-btn" type="button">更新</button>
+        <h2 id="messageCenterTitle">訊息中心</h2>
+        <button class="modal-close-btn" data-close-modal="messageCenterModal" type="button" aria-label="關閉訊息中心">×</button>
+      </div>
+
+      <div class="message-center-tabs" role="tablist" aria-label="訊息類型">
+        <button class="message-center-tab active" data-message-center-tab="ANNOUNCEMENT" type="button">系統公告</button>
+        <button class="message-center-tab" data-message-center-tab="SPECIAL_TASK" type="button">特殊任務</button>
+        <button class="message-center-tab" data-message-center-tab="REWARD_NOTIFICATION" type="button">任務獎勵</button>
+      </div>
+
+      <div id="messageCenterEmpty" class="empty-card hidden">目前沒有訊息</div>
+
+      <div id="messageCenterLayout" class="message-center-layout">
+        <label id="messageCenterSelectorRow" class="message-center-selector hidden">
+          <span>選擇訊息</span>
+          <select id="messageCenterSelector"></select>
+        </label>
+
+        <article id="messageCenterDetail" class="message-center-detail">
+          <header class="message-center-detail-heading">
+            <div class="message-center-detail-identity">
+              <div id="messageCenterDetailIcon" class="message-center-detail-icon" aria-hidden="true"></div>
+              <h3 id="messageCenterDetailTitle"></h3>
+            </div>
+            <span id="messageCenterDetailType" class="message-center-type-label"></span>
+          </header>
+
+          <div class="message-center-detail-copy">
+            <section id="messageCenterRewardBox" class="message-center-reward-box hidden">
+              <strong>獎勵內容</strong>
+              <span id="messageCenterRewardText"></span>
+            </section>
+            <p id="messageCenterDetailContent" class="message-center-content"></p>
+            <label id="messageCenterSuppressRow" class="message-center-suppress hidden">
+              <input id="messageCenterSuppressToday" type="checkbox">
+              <span>今日不再自動顯示</span>
+            </label>
+          </div>
+        </article>
+      </div>
+
+    </div>
+  </div>
+
   <div id="avatarModal" class="modal-layer hidden" role="dialog" aria-modal="true">
     <div class="modal-card">
       <div class="modal-header">
@@ -564,7 +565,7 @@
       </label>
 
       <section class="avatar-picker-card">
-        <img id="avatarModalPreview" class="avatar-preview-img" alt="">
+        <img id="avatarModalPreview" class="avatar-preview-img" alt="頭像預覽">
 
         <div>
           <strong id="avatarModalInfo">尚未選擇</strong>
@@ -982,54 +983,8 @@
     </div>
   </div>
 
-  <script>
-    (() => {
-      const LOGIN_FIELD_IDS = ["loginName", "loginPassword"];
-
-      function getLoginFields() {
-        return LOGIN_FIELD_IDS
-          .map((id) => document.getElementById(id))
-          .filter(Boolean);
-      }
-
-      function clearLockedLoginFields() {
-        getLoginFields().forEach((field) => {
-          if (field.hasAttribute("readonly")) {
-            field.value = "";
-          }
-        });
-      }
-
-      function unlockLoginField(event) {
-        const field = event.currentTarget;
-        field.removeAttribute("readonly");
-        field.value = "";
-      }
-
-      document.addEventListener("DOMContentLoaded", () => {
-        getLoginFields().forEach((field) => {
-          field.value = "";
-          field.setAttribute("readonly", "");
-
-          field.addEventListener("focus", unlockLoginField, { once: true });
-          field.addEventListener("pointerdown", unlockLoginField, { once: true });
-        });
-
-        clearLockedLoginFields();
-        window.setTimeout(clearLockedLoginFields, 100);
-        window.setTimeout(clearLockedLoginFields, 500);
-      });
-
-      window.addEventListener("pageshow", () => {
-        clearLockedLoginFields();
-        window.setTimeout(clearLockedLoginFields, 100);
-        window.setTimeout(clearLockedLoginFields, 500);
-      });
-    })();
-  </script>
-
-  <script src="server-client.js?v=20260715-avatar-v1"></script>
-  <script src="script.js?v=20260715-avatar-v1"></script>
-  <script src="runtime-settings.js?v=20260715-avatar-v1"></script>
+  <script src="runtime-settings.js?v=20260724-github-v01321"></script>
+  <script src="server-client.js?v=20260724-github-v01321"></script>
+  <script src="script.js?v=20260724-github-v01321"></script>
 </body>
 </html>

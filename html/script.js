@@ -1,6 +1,7 @@
 const STORAGE_KEY = 'yct_current_player';
-  const ASSET_BASE_URL = '..';
-  const ASSET_VERSION = '20260709';
+  const MESSAGE_SUPPRESSION_RETRY_KEY = 'yct_message_suppression_retry';
+  const ASSET_BASE_URL = 'https://raw.githubusercontent.com/danielkao-31/ys/main';
+  const ASSET_VERSION = '20260723-v01313';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -24,6 +25,9 @@ const STORAGE_KEY = 'yct_current_player';
       gamePanel: ASSET_BASE_URL + '/UI/quest-panel-cute-v4.png',
       iconPrayerLink: ASSET_BASE_URL + '/UI/icon-prayer-link.png',
       iconGrowth: ASSET_BASE_URL + '/UI/icon-growth.png',
+      systemAnnouncement: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_07.png',
+      specialTaskInProgress: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_01.png',
+      specialTaskCompleted: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_03.png',
       fallbackChest: IMAGE_FALLBACK_DATA_URL
     };
 
@@ -45,11 +49,14 @@ const STORAGE_KEY = 'yct_current_player';
   ];
   const SESSION_TOKEN_ARG_APIS = [
     'getHomeDashboard',
+    'getHomeSyncState',
+    'getPlayerMessageCenter',
     'getMyVitalGroups',
     'getDailyPracticeStatus',
     'getDailyPracticeHistory',
     'getMeetingPracticeStatus',
     'getMeetingPracticeHistory',
+    'getMyFootprintDashboard',
     'getPrayerRequests',
     'getPrayerCarousel',
     'getMyPrayerRequests',
@@ -62,6 +69,8 @@ const STORAGE_KEY = 'yct_current_player';
   ];
   const SESSION_PAYLOAD_APIS = [
     'updatePlayerAvatar',
+    'markPlayerMessageRead',
+    'suppressPlayerMessageToday',
     'updateMyAccount',
     'updateMyPassword',
     'createVitalGroup',
@@ -84,6 +93,38 @@ const STORAGE_KEY = 'yct_current_player';
     'advancePlayerCycle'
   ];
 
+  const CACHE_DEFAULT_TTL_MS = 5 * 60 * 1000;
+  const CACHE_POLICIES = {
+    dashboard: 90 * 1000,
+    dailyPractice: 2 * 60 * 1000,
+    meetingPractice: 2 * 60 * 1000,
+    practiceHistory: 2 * 60 * 1000,
+    journey: 2 * 60 * 1000,
+    groupJourneyList: 2 * 60 * 1000,
+    contribution: 2 * 60 * 1000,
+    growth: 2 * 60 * 1000,
+    chestSummary: 2 * 60 * 1000,
+    chestCollection: 2 * 60 * 1000,
+    chestSettingsForPlayer: 5 * 60 * 1000,
+    prayerList: 60 * 1000,
+    myPrayers: 60 * 1000,
+    accountProfile: 3 * 60 * 1000,
+    groupInfo: 3 * 60 * 1000
+  };
+  const HOME_SYNC_POLL_MS = 60 * 1000;
+  const SERVER_READ_CALL_TIMEOUT_MS = 60 * 1000;
+  const SERVER_MUTATION_APIS = new Set([
+    'loginPlayer', 'registerPlayer', 'logoutPlayer', 'updatePlayerAvatar', 'markPlayerMessageRead',
+    'suppressPlayerMessageToday', 'updateMyAccount', 'updateMyPassword',
+    'createVitalGroup', 'joinVitalGroupByInviteCode', 'switchPrimaryVitalGroup',
+    'leaveVitalGroup', 'createGroupPost', 'updateGroupPost', 'deleteGroupPost',
+    'submitDailyPractice', 'submitMeetingPractice', 'createPrayerRequest',
+    'respondPrayerRequest', 'updatePrayerRequest', 'closePrayerRequest',
+    'claimPlayerChestReward', 'advancePlayerCycle'
+  ]);
+  const PENDING_MUTATION_TTL_MS = 24 * 60 * 60 * 1000;
+  const TAIPEI_UTC_OFFSET_MS = 8 * 60 * 60 * 1000;
+
   const JOURNEY_CHAPTERS = [
     { key: 'faith', title: '信心' },
     { key: 'virtue', title: '美德' },
@@ -95,59 +136,143 @@ const STORAGE_KEY = 'yct_current_player';
     { key: 'love', title: '愛' }
   ];
 
+  /*
+   * 前端只保留欄位對應，不保存任務名稱、積分或確認文字。
+   * 實際顯示內容全部由後端 SystemSettings → taskConfig 注入，
+   * 避免前後端各自硬編碼一套設定。
+   */
   const PRACTICE_CONFIG = {
     morning: {
       field: 'morningRevival',
-      title: '小組晨興',
-      description: '今天是否已完成小組晨興？',
-      reward: '活力組貢獻 +20'
+      title: '',
+      description: '',
+      reward: ''
     },
     bible: {
       field: 'bibleReading',
-      title: '個人讀經',
-      description: '今天是否已完成個人讀經？',
-      reward: '活力組貢獻 +30'
+      title: '',
+      description: '',
+      reward: ''
     },
     prayer: {
       field: 'prayer',
-      title: '個人禱告',
-      description: '今天是否已完成個人禱告？',
-      reward: '活力組貢獻 +20'
+      title: '',
+      description: '',
+      reward: ''
     },
     book: {
       field: 'bookPursuit',
-      title: '書報追求',
-      description: '今天是否已完成書報追求？',
-      reward: '活力組貢獻 +30'
+      title: '',
+      description: '',
+      reward: ''
     }
   };
 
   const WEEKLY_TASK_CONFIG = {
     outreachVisit: {
       field: 'outreachVisit',
-      title: '外出探訪',
-      description: '確認本週已完成外出探訪。',
-      reward: '活力組貢獻 +50'
+      title: '',
+      description: '',
+      reward: ''
     },
     smallGroup: {
       field: 'smallGroup',
-      title: '小排聚會',
-      description: '確認本週已完成小排聚會。',
-      reward: '活力組貢獻 +40'
+      title: '',
+      description: '',
+      reward: ''
     },
     prayerMeeting: {
       field: 'prayerMeeting',
-      title: '禱告聚會',
-      description: '確認本週已完成禱告聚會。',
-      reward: '活力組貢獻 +40'
+      title: '',
+      description: '',
+      reward: ''
     },
     lordDayMeeting: {
       field: 'lordDayMeeting',
-      title: '主日聚會',
-      description: '確認本週已完成主日聚會。',
-      reward: '活力組貢獻 +50'
+      title: '',
+      description: '',
+      reward: ''
     }
   };
+
+
+  function applyTaskConfiguration_(taskConfig) {
+    taskConfig = taskConfig || {};
+    const daily = taskConfig.daily || {};
+    const meeting = taskConfig.meeting || {};
+
+    Object.keys(PRACTICE_CONFIG).forEach((type) => {
+      const source = daily[type] || {};
+      const config = PRACTICE_CONFIG[type];
+
+      config.title = String(source.title || '').trim();
+      config.description = String(source.description || '').trim();
+
+      const score = Math.max(0, Number(source.score || 0));
+      config.reward = String(source.reward || '').trim() ||
+        (
+          type === 'morning'
+            ? '合作取得 +' + score
+            : '個人貢獻 +' + score
+        );
+    });
+
+    Object.keys(WEEKLY_TASK_CONFIG).forEach((type) => {
+      const source = meeting[type] || {};
+      const config = WEEKLY_TASK_CONFIG[type];
+
+      config.title = String(source.title || '').trim();
+      config.description = String(source.description || '').trim();
+
+      const score = Math.max(0, Number(source.score || 0));
+      config.reward = String(source.reward || '').trim() ||
+        (
+          type === 'outreachVisit'
+            ? '合作取得 +' + score
+            : '個人貢獻 +' + score
+        );
+    });
+
+    const cardTargets = {
+      morning: ['#homeMorningBtn', '#dailyMorningBtn'],
+      bible: ['#homeBibleBtn', '#dailyBibleBtn'],
+      prayer: ['#homePrayerPracticeBtn', '#dailyPrayerBtn'],
+      book: ['#homeBookBtn', '#dailyBookBtn'],
+      outreachVisit: ['#homeOutreachVisitBtn'],
+      smallGroup: ['#homeWeeklySmallGroupBtn'],
+      prayerMeeting: ['#homeWeeklyPrayerMeetingBtn'],
+      lordDayMeeting: ['#homeWeeklyLordDayBtn']
+    };
+
+    Object.keys(cardTargets).forEach((type) => {
+      const config =
+        PRACTICE_CONFIG[type] ||
+        WEEKLY_TASK_CONFIG[type];
+
+      if (!config) {
+        return;
+      }
+
+      cardTargets[type].forEach((selector) => {
+        const card = document.querySelector(selector);
+
+        if (!card) {
+          return;
+        }
+
+        const title = card.querySelector('strong');
+        const reward = card.querySelector('small');
+
+        if (title) {
+          title.textContent = config.title;
+        }
+
+        if (reward) {
+          reward.textContent = config.reward;
+        }
+      });
+    });
+  }
 
   const state = {
     currentPlayer: null,
@@ -163,12 +288,29 @@ const STORAGE_KEY = 'yct_current_player';
     homeGroupPosts: [],
     homeGroupMemberCount: 0,
     chestSummary: null,
+    messageCenter: createEmptyMessageCenterState_(),
+    messageCenterFilter: 'ANNOUNCEMENT',
+    selectedMessageKey: '',
+    messageCenterAutoOpenedKey: '',
+    pendingMessageCenterSuppressions: new Map(),
+    messageCenterSuppressionFlushInFlight: new Set(),
+    messageCenterSuppressionRetryAttempts: new Map(),
+    messageCenterSuppressionRetryTimer: null,
     prayerCarouselItems: [],
     explorePrayerItems: [],
     myPrayerItems: [],
     vitalGroups: [],
     selectedPracticeType: '',
     selectedWeeklyTaskType: '',
+    pendingDailyRequestId: '',
+    pendingWeeklyRequestId: '',
+    pendingPrayerResponseRequestIds: {},
+    pendingGroupCreateRequestId: '',
+    pendingGroupCreateSignature: '',
+    pendingGroupPostCreateRequestId: '',
+    pendingGroupPostCreateSignature: '',
+    pendingPrayerCreateRequestId: '',
+    pendingPrayerCreateSignature: '',
     selectedPrayer: null,
     selectedMyPrayerDetail: null,
     selectedPrayerForEdit: null,
@@ -183,7 +325,12 @@ const STORAGE_KEY = 'yct_current_player';
     dismissedCycleAdvancePrompts: {},
     imageLoadQueue: [],
     activeImageLoads: 0,
-    imageCache: {}
+    imageCache: {},
+    businessDate: '',
+    homeSyncToken: '',
+    homeSyncCheckInFlight: false,
+    crossDayRefreshTimer: null,
+    homeSyncTimer: null
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -197,8 +344,184 @@ const STORAGE_KEY = 'yct_current_player';
     bindEvents();
     initRegisterAvatar();
     hydrateExistingImages_();
+    initializeAppLifecycleRefresh_();
     restoreSession();
   }
+
+  function getTaipeiBusinessDate_() {
+    return new Date(
+      Date.now() + TAIPEI_UTC_OFFSET_MS
+    ).toISOString().slice(0, 10);
+  }
+
+  function getMillisecondsUntilNextTaipeiMidnight_() {
+    const now = Date.now();
+    const taipeiNow = new Date(now + TAIPEI_UTC_OFFSET_MS);
+    const nextMidnightTaipeiAsUtc = Date.UTC(
+      taipeiNow.getUTCFullYear(),
+      taipeiNow.getUTCMonth(),
+      taipeiNow.getUTCDate() + 1,
+      0,
+      0,
+      0,
+      0
+    );
+    const targetUtc =
+      nextMidnightTaipeiAsUtc -
+      TAIPEI_UTC_OFFSET_MS;
+
+    return Math.max(
+      1000,
+      targetUtc - now + 250
+    );
+  }
+
+  function scheduleNextTaipeiMidnightRefresh_() {
+    if (state.crossDayRefreshTimer) {
+      window.clearTimeout(state.crossDayRefreshTimer);
+    }
+
+    state.crossDayRefreshTimer = window.setTimeout(() => {
+      handleBusinessDateBoundary_();
+      scheduleNextTaipeiMidnightRefresh_();
+    }, getMillisecondsUntilNextTaipeiMidnight_());
+  }
+
+  function handleBusinessDateBoundary_() {
+    const currentDate = getTaipeiBusinessDate_();
+    const previousDate = String(state.businessDate || '');
+
+    if (!previousDate) {
+      state.businessDate = currentDate;
+      return false;
+    }
+
+    if (previousDate === currentDate) {
+      return false;
+    }
+
+    state.businessDate = currentDate;
+    state.homeSyncToken = '';
+
+    /*
+     * 跨日後所有前端資料快取立即失效。
+     * 不只首頁：每日紀錄、聚會週期、訊息中心與旅程資料都重新以新日期取得。
+     */
+    clearAllAppCache_();
+    state.dailyRecord = createEmptyDailyRecord();
+    state.weeklyTaskRecord = createEmptyWeeklyTaskRecord();
+
+    if (
+      state.currentPlayer &&
+      state.currentPlayer.playerId &&
+      state.sessionToken
+    ) {
+      refreshDashboard(false);
+    }
+
+    return true;
+  }
+
+  function checkHomeSyncState_() {
+    if (
+      state.homeSyncCheckInFlight ||
+      !state.sessionToken ||
+      !state.currentPlayer ||
+      !state.currentPlayer.playerId ||
+      document.visibilityState === 'hidden'
+    ) {
+      return;
+    }
+
+    state.homeSyncCheckInFlight = true;
+
+    callServer('getHomeSyncState')
+      .then((res) => {
+        if (!isSuccess(res) || !res.data) {
+          return;
+        }
+
+        const data = res.data || {};
+        const serverBusinessDate = String(
+          data.businessDate || ''
+        ).trim();
+
+        if (
+          serverBusinessDate &&
+          serverBusinessDate !==
+            String(state.businessDate || '')
+        ) {
+          state.businessDate = serverBusinessDate;
+          state.homeSyncToken = '';
+          clearAllAppCache_();
+          refreshDashboard(false);
+          return;
+        }
+
+        const nextToken = String(data.token || '').trim();
+
+        if (!nextToken) {
+          return;
+        }
+
+        if (!state.homeSyncToken) {
+          state.homeSyncToken = nextToken;
+          return;
+        }
+
+        if (nextToken !== state.homeSyncToken) {
+          state.homeSyncToken = nextToken;
+          invalidateCache_('dashboard');
+          invalidateCaches_([
+            'journey',
+            'groupJourneyList',
+            'contribution',
+            'growth',
+            'chestSummary',
+            'chestCollection',
+            'accountProfile'
+          ]);
+          refreshDashboard(false);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        state.homeSyncCheckInFlight = false;
+      });
+  }
+
+  function handleAppResume_() {
+    const crossedDate = handleBusinessDateBoundary_();
+
+    if (!crossedDate) {
+      checkHomeSyncState_();
+    }
+  }
+
+  function initializeAppLifecycleRefresh_() {
+    state.businessDate = getTaipeiBusinessDate_();
+
+    scheduleNextTaipeiMidnightRefresh_();
+
+    if (state.homeSyncTimer) {
+      window.clearInterval(state.homeSyncTimer);
+    }
+
+    state.homeSyncTimer = window.setInterval(
+      checkHomeSyncState_,
+      HOME_SYNC_POLL_MS
+    );
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        handleAppResume_();
+      }
+    });
+
+    window.addEventListener('pageshow', handleAppResume_);
+    window.addEventListener('focus', handleAppResume_);
+  }
+
 
   function preloadCriticalBackgrounds_() {
     const root = document.documentElement;
@@ -486,20 +809,28 @@ const STORAGE_KEY = 'yct_current_player';
   function bindEvents() {
     $('#loginForm').addEventListener('submit', handleLogin);
     $('#openRegisterBtn').addEventListener('click', openRegisterModal);
-    $('#openPasswordResetBtn').addEventListener('click', openPasswordResetModal);
-    $('#passwordResetForm').addEventListener('submit', handlePasswordResetSubmit);
     $('#registerForm').addEventListener('submit', handleRegister);
     $('#registerCareDistrict').addEventListener(
       'change',
       handleRegisterCareDistrictChange
     );
-    
     $('#registerAvatarGender').addEventListener('change', randomizeRegisterAvatar);
     $('#registerPrevAvatarBtn').addEventListener('click', () => stepRegisterAvatar(-1));
     $('#registerRandomAvatarBtn').addEventListener('click', randomizeRegisterAvatar);
     $('#registerNextAvatarBtn').addEventListener('click', () => stepRegisterAvatar(1));
 
-    $('#homeAvatarBtn').addEventListener('click', openAvatarModal);
+    $('#homeAvatarBtn').addEventListener('click', () => openMessageCenter_({ refresh: true }));
+    $('#refreshMessageCenterBtn').addEventListener('click', refreshMessageCenter_);
+    $('#messageCenterSelector').addEventListener('change', handleMessageCenterSelectorChange_);
+    $('#messageCenterSuppressToday').addEventListener('change', handleMessageCenterSuppressChange_);
+    $$('.message-center-tab').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.messageCenterFilter = button.dataset.messageCenterTab || 'ANNOUNCEMENT';
+        state.selectedMessageKey = '';
+        renderMessageCenter_();
+        markCurrentMessageRead_(false);
+      });
+    });
     $('#refreshHomeBtn').addEventListener('click', () => {
       invalidateCache_('dashboard');
       refreshDashboard(true);
@@ -689,12 +1020,22 @@ const STORAGE_KEY = 'yct_current_player';
       '';
     persistCurrentPlayer();
 
+    state.homeSyncToken = String(data.syncToken || '').trim();
+    state.businessDate = String(
+      data.businessDate || getTaipeiBusinessDate_()
+    ).trim();
+
+    if (data.taskConfig) {
+      applyTaskConfiguration_(data.taskConfig);
+    }
+
     setCache_('dashboard', data);
     showView('home', {
       skipDataLoad: true
     });
     renderDashboardData_(data);
     setLoading(false);
+    window.setTimeout(retryPendingMessageCenterSuppression_, 0);
   }
 
   function showInitialLoadError_(message) {
@@ -808,6 +1149,14 @@ const STORAGE_KEY = 'yct_current_player';
       return;
     }
 
+    if (id === 'messageCenterModal') {
+      // 先同步保存本機重試資料，並立即啟動非同步後端寫入。
+      // GAS JSON API 呼叫本身不阻塞 UI，因此視窗仍會立即關閉；
+      // 同時避免 setTimeout 尚未執行就重新整理而漏送請求。
+      stagePendingMessageCenterSuppressionForRetry_();
+      flushPendingMessageCenterSuppression_();
+    }
+
     $('#' + id).classList.add('hidden');
 
     if (id === 'confirmModal') {
@@ -816,6 +1165,15 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function closeAllModals() {
+    const messageCenterModal = $('#messageCenterModal');
+    const shouldFlushMessageCenterSuppression =
+      !!messageCenterModal && !messageCenterModal.classList.contains('hidden');
+
+    if (shouldFlushMessageCenterSuppression) {
+      stagePendingMessageCenterSuppressionForRetry_();
+      flushPendingMessageCenterSuppression_();
+    }
+
     $$('.modal-layer').forEach((modal) => {
       modal.classList.add('hidden');
     });
@@ -830,7 +1188,7 @@ const STORAGE_KEY = 'yct_current_player';
     const passwordCode = $('#loginPassword').value.trim();
 
     if (!playerName || !passwordCode) {
-      showAuthMessage(!playerName ? '請輸入姓名' : '請輸入登入密碼');
+      showAuthMessage(!playerName ? '請輸入登入帳號' : '請輸入登入密碼');
       return;
     }
 
@@ -839,7 +1197,8 @@ const STORAGE_KEY = 'yct_current_player';
     callServer('loginPlayer', playerName, passwordCode)
       .then((res) => {
         if (!isSuccess(res)) {
-          handleLoginFailure_(res);
+          setLoading(false);
+          showAuthMessage(getResponseError(res, '登入失敗'));
           return null;
         }
 
@@ -865,77 +1224,20 @@ const STORAGE_KEY = 'yct_current_player';
         }
 
         enterHomeWithDashboard_(dashboardRes.data);
+
+        if (state.currentPlayer && state.currentPlayer.passwordMustChange) {
+          openAccountSettingsModal();
+          setResultMessage(
+            '#accountSettingsMessage',
+            '此帳號目前使用臨時密碼，請先修改登入密碼後再繼續操作。'
+          );
+        }
       })
       .catch((error) => {
         showAuth();
         showAuthMessage(getErrorMessage(error));
         setLoading(false);
       });
-  }
-
-  function handleLoginFailure_(res) {
-    const code = String(res && res.code || '').trim();
-    const loginNameField = $('#loginName');
-    const passwordField = $('#loginPassword');
-
-    setLoading(false);
-    showAuthMessage(getLoginErrorMessage_(res));
-
-    if (passwordField) {
-      passwordField.value = '';
-    }
-
-    window.setTimeout(() => {
-      const shouldFocusPassword = code === 'PASSWORD_INCORRECT';
-      const target = shouldFocusPassword
-        ? passwordField
-        : loginNameField;
-
-      if (!target) {
-        return;
-      }
-
-      target.removeAttribute('readonly');
-      target.focus();
-
-      if (!shouldFocusPassword && typeof target.select === 'function') {
-        target.select();
-      }
-    }, 0);
-  }
-
-  function getLoginErrorMessage_(res) {
-    const code = String(res && res.code || '').trim();
-    const data = res && res.data ? res.data : {};
-
-    if (code === 'ACCOUNT_NOT_FOUND') {
-      return '找不到此帳號或姓名，請確認輸入是否正確。';
-    }
-
-    if (code === 'AMBIGUOUS_NAME') {
-      return '此姓名有多位使用者，請改用登入帳號。';
-    }
-
-    if (code === 'PASSWORD_INCORRECT') {
-      const remainingAttempts = Number(data.remainingAttempts);
-
-      return remainingAttempts > 0
-        ? '登入密碼錯誤，剩餘可嘗試次數：' + remainingAttempts
-        : '登入密碼錯誤，請重新輸入。';
-    }
-
-    if (code === 'ACCOUNT_DISABLED') {
-      return '此帳號已停用，請聯絡管理者。';
-    }
-
-    if (code === 'ACCOUNT_LOCKED') {
-      return getResponseError(
-        res,
-        '登入錯誤次數過多，請稍後再試。'
-      );
-    }
-
-    return getResponseError(res, '登入失敗');
   }
 
   function initRegisterAvatar() {
@@ -1086,64 +1388,7 @@ const STORAGE_KEY = 'yct_current_player';
     select.value = exists ? value : '';
   }
 
-  function openPasswordResetModal() {
-    $('#passwordResetLoginName').value = $('#loginName').value.trim();
-    $('#passwordResetName').value = '';
-    $('#passwordResetBirthYear').value = '';
-    $('#passwordResetNewPassword').value = '';
-    setResultMessage('#passwordResetMessage', '', false);
-    openModal('passwordResetModal');
-  }
 
-  function handlePasswordResetSubmit(event) {
-    event.preventDefault();
-
-    const payload = {
-      loginName: $('#passwordResetLoginName').value.trim(),
-      displayName: $('#passwordResetName').value.trim(),
-      birthYear: $('#passwordResetBirthYear').value.trim(),
-      newPasswordCode: $('#passwordResetNewPassword').value.trim()
-    };
-
-    if (
-      !payload.loginName ||
-      !payload.displayName ||
-      !payload.birthYear ||
-      !payload.newPasswordCode
-    ) {
-      setResultMessage('#passwordResetMessage', '請完整輸入帳號、顯示名稱、出生年與新登入密碼');
-      return;
-    }
-
-    setLoading(true, '重設登入密碼...');
-
-    callServer('resetPlayerPasswordBySelf', payload)
-      .then((res) => {
-        if (!isSuccess(res)) {
-          setResultMessage(
-            '#passwordResetMessage',
-            getResponseError(res, '重設登入密碼失敗')
-          );
-          return;
-        }
-
-        $('#passwordResetLoginName').value = '';
-        $('#passwordResetName').value = '';
-        $('#passwordResetBirthYear').value = '';
-        $('#passwordResetNewPassword').value = '';
-        setResultMessage(
-          '#passwordResetMessage',
-          res.data.message || '登入密碼已重設，請用新密碼登入。',
-          true
-        );
-      })
-      .catch((error) => {
-        setResultMessage('#passwordResetMessage', getErrorMessage(error));
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }
 
   function randomizeRegisterAvatar() {
     state.registerAvatar = buildRandomAvatar(
@@ -1290,11 +1535,763 @@ const STORAGE_KEY = 'yct_current_player';
         }
 
         enterHomeWithDashboard_(dashboardRes.data);
+
+        if (state.currentPlayer && state.currentPlayer.passwordMustChange) {
+          openAccountSettingsModal();
+          setResultMessage(
+            '#accountSettingsMessage',
+            '此帳號目前使用臨時密碼，請先修改登入密碼後再繼續操作。'
+          );
+        }
       })
       .catch((error) => {
         setResultMessage('#registerMessage', getErrorMessage(error));
         setLoading(false);
       });
+  }
+
+  function createEmptyMessageCenterState_() {
+    return {
+      announcements: [],
+      specialTasks: [],
+      rewardNotifications: [],
+      hasBadge: false,
+      shouldAutoOpen: false,
+      suppressAutoOpenToday: false,
+      defaultMessageType: '',
+      defaultMessageId: '',
+      currentDate: ''
+    };
+  }
+
+  function normalizeMessageCenterData_(data) {
+    const center = Object.assign(createEmptyMessageCenterState_(), data || {});
+
+    center.announcements = Array.isArray(center.announcements)
+      ? center.announcements
+      : [];
+    center.specialTasks = Array.isArray(center.specialTasks)
+      ? center.specialTasks
+      : [];
+    center.rewardNotifications = Array.isArray(center.rewardNotifications)
+      ? center.rewardNotifications
+      : [];
+
+    return center;
+  }
+
+  function applyMessageCenterData_(data, allowAutoOpen) {
+    state.messageCenter = normalizeMessageCenterData_(data);
+
+    // 後端背景寫入尚未完成時，先套用本機已確認的「今日不再顯示」。
+    // 這可避免使用者關閉訊息後立即重新整理，訊息因後端狀態尚未落盤而再次跳出。
+    applyQueuedMessageCenterSuppressionLocally_();
+    renderHomeMessageBadge_();
+
+    if (allowAutoOpen) {
+      maybeAutoOpenMessageCenter_();
+    }
+  }
+
+  function renderHomeMessageBadge_() {
+    const badge = $('#homeMessageBadge');
+
+    if (!badge) {
+      return;
+    }
+
+    badge.classList.remove('hidden');
+  }
+
+  function maybeAutoOpenMessageCenter_() {
+    const center = state.messageCenter || createEmptyMessageCenterState_();
+
+    if (!center.shouldAutoOpen || !center.defaultMessageId) {
+      return;
+    }
+
+    const defaultMessage = findMessageCenterItem_(
+      center.defaultMessageType,
+      center.defaultMessageId
+    );
+
+    if (!defaultMessage) {
+      return;
+    }
+
+    const key = buildMessageCenterItemKey_(defaultMessage);
+
+    if (!key || state.messageCenterAutoOpenedKey === key) {
+      return;
+    }
+
+    state.messageCenterAutoOpenedKey = key;
+    state.selectedMessageKey = key;
+    state.messageCenterFilter = defaultMessage.messageType || 'ANNOUNCEMENT';
+    renderMessageCenter_();
+    openModal('messageCenterModal');
+    markSelectedMessageRead_(defaultMessage, true);
+  }
+
+  function openMessageCenter_(options) {
+    options = options || {};
+
+    if (!state.currentPlayer) {
+      return;
+    }
+
+    if (!options.refresh) {
+      selectDefaultMessageCenterItem_();
+      renderMessageCenter_();
+      openModal('messageCenterModal');
+      markCurrentMessageRead_(false);
+      return;
+    }
+
+    setLoading(true, '更新訊息中心...');
+
+    callServer('getPlayerMessageCenter')
+      .then((res) => {
+        if (!isSuccess(res)) {
+          window.alert(getResponseError(res, '訊息中心讀取失敗'));
+          openModal('messageCenterModal');
+          return;
+        }
+
+        applyMessageCenterData_(res.data, false);
+        selectDefaultMessageCenterItem_();
+        renderMessageCenter_();
+        openModal('messageCenterModal');
+        markCurrentMessageRead_(false);
+      })
+      .catch((error) => {
+        window.alert(getErrorMessage(error));
+        openModal('messageCenterModal');
+      })
+      .finally(() => setLoading(false));
+  }
+
+  function refreshMessageCenter_() {
+    openMessageCenter_({ refresh: true });
+  }
+
+  function selectDefaultMessageCenterItem_() {
+    const center = state.messageCenter || createEmptyMessageCenterState_();
+    const firstAnnouncement = (center.announcements || [])[0] || null;
+    const preferred = findMessageCenterItem_(
+      center.defaultMessageType,
+      center.defaultMessageId
+    );
+    const fallback = firstAnnouncement ||
+      preferred ||
+      (center.specialTasks || [])[0] ||
+      (center.rewardNotifications || [])[0] ||
+      null;
+
+    state.selectedMessageKey = fallback
+      ? buildMessageCenterItemKey_(fallback)
+      : '';
+    state.messageCenterFilter = fallback
+      ? fallback.messageType
+      : 'ANNOUNCEMENT';
+  }
+
+  function getAllMessageCenterItems_() {
+    const center = state.messageCenter || createEmptyMessageCenterState_();
+    const items = []
+      .concat(center.rewardNotifications || [])
+      .concat(center.specialTasks || [])
+      .concat(center.announcements || []);
+
+    return items.sort((a, b) => {
+      const aTime = String(a.updatedAt || a.publishedAt || '');
+      const bTime = String(b.updatedAt || b.publishedAt || '');
+      return bTime.localeCompare(aTime);
+    });
+  }
+
+  function getFilteredMessageCenterItems_() {
+    const filter = state.messageCenterFilter || 'ANNOUNCEMENT';
+    return getAllMessageCenterItems_().filter((item) => {
+      return item.messageType === filter;
+    });
+  }
+
+  function buildMessageCenterItemKey_(message) {
+    if (!message) {
+      return '';
+    }
+
+    return [
+      String(message.messageType || ''),
+      String(message.messageId || ''),
+      String(Number(message.messageVersion || 1))
+    ].join('::');
+  }
+
+  function findMessageCenterItem_(messageType, messageId) {
+    return getAllMessageCenterItems_().find((item) => {
+      return String(item.messageType || '') === String(messageType || '') &&
+        String(item.messageId || '') === String(messageId || '');
+    }) || null;
+  }
+
+  function getSelectedMessageCenterItem_() {
+    const key = String(state.selectedMessageKey || '');
+
+    if (!key) {
+      return null;
+    }
+
+    return getAllMessageCenterItems_().find((item) => {
+      return buildMessageCenterItemKey_(item) === key;
+    }) || null;
+  }
+
+  function hasMessageCenterTabAlert_(messageType) {
+    const center = state.messageCenter || createEmptyMessageCenterState_();
+    const collections = {
+      ANNOUNCEMENT: center.announcements || [],
+      SPECIAL_TASK: center.specialTasks || [],
+      REWARD_NOTIFICATION: center.rewardNotifications || []
+    };
+
+    return (collections[messageType] || []).some((message) => {
+      if (!message.isRead) {
+        return true;
+      }
+
+      if (messageType !== 'REWARD_NOTIFICATION') {
+        return false;
+      }
+
+      return String(message.rewardStatus || '').trim() === 'NOTIFIED';
+    });
+  }
+
+  function renderMessageCenter_() {
+    $$('.message-center-tab').forEach((button) => {
+      const messageType = button.dataset.messageCenterTab || 'ANNOUNCEMENT';
+      button.classList.toggle(
+        'active',
+        messageType === state.messageCenterFilter
+      );
+      button.classList.toggle(
+        'has-alert',
+        hasMessageCenterTabAlert_(messageType)
+      );
+    });
+
+    const items = getFilteredMessageCenterItems_();
+    const empty = $('#messageCenterEmpty');
+    const layout = $('#messageCenterLayout');
+    const selectorRow = $('#messageCenterSelectorRow');
+    const selector = $('#messageCenterSelector');
+
+    if (!items.length) {
+      state.selectedMessageKey = '';
+      selector.innerHTML = '';
+      selectorRow.classList.add('hidden');
+      empty.classList.remove('hidden');
+      layout.classList.add('hidden');
+      clearMessageCenterDetail_();
+      return;
+    }
+
+    empty.classList.add('hidden');
+    layout.classList.remove('hidden');
+
+    const selected = getSelectedMessageCenterItem_();
+    const selectedVisible = selected && items.some((item) => {
+      return buildMessageCenterItemKey_(item) === buildMessageCenterItemKey_(selected);
+    });
+
+    if (!selectedVisible) {
+      state.selectedMessageKey = buildMessageCenterItemKey_(items[0]);
+    }
+
+    selector.innerHTML = items.map((item) => {
+      const key = buildMessageCenterItemKey_(item);
+      const readText = item.isRead ? '已讀' : '未讀';
+      const label = [item.title || '未命名訊息', readText]
+        .filter(Boolean)
+        .join('｜');
+
+      return '<option value="' + escapeHtml(key) + '">' +
+        escapeHtml(label) +
+        '</option>';
+    }).join('');
+    selector.value = state.selectedMessageKey;
+    selectorRow.classList.toggle('hidden', items.length <= 1);
+
+    renderMessageCenterDetail_(getSelectedMessageCenterItem_());
+  }
+
+  function handleMessageCenterSelectorChange_(event) {
+    state.selectedMessageKey = event.target.value || '';
+    renderMessageCenter_();
+    markCurrentMessageRead_(false);
+  }
+
+  function renderMessageCenterDetail_(message) {
+    if (!message) {
+      clearMessageCenterDetail_();
+      return;
+    }
+
+    renderMessageCenterIcon_($('#messageCenterDetailIcon'), message);
+
+    $('#messageCenterDetailType').textContent = getMessageCenterTypeLabel_(message.messageType);
+    $('#messageCenterDetailTitle').textContent = message.title || '未命名訊息';
+    $('#messageCenterDetailContent').textContent = message.content || '';
+
+    const rewardBox = $('#messageCenterRewardBox');
+    const hasReward = !!String(message.rewardText || '').trim();
+    rewardBox.classList.toggle('hidden', !hasReward);
+    $('#messageCenterRewardText').textContent = message.rewardText || '';
+
+    const suppressRow = $('#messageCenterSuppressRow');
+    const canSuppress = message.messageType === 'ANNOUNCEMENT' ||
+      message.messageType === 'SPECIAL_TASK';
+    suppressRow.classList.toggle('hidden', !canSuppress);
+
+    const checkbox = $('#messageCenterSuppressToday');
+    const suppressionRecord = buildCurrentMessageCenterSuppressionRecord_();
+    const suppressionKey = buildMessageCenterSuppressionStorageKey_(suppressionRecord);
+    const pendingSuppression =
+      state.pendingMessageCenterSuppressions.has(suppressionKey);
+    const suppressionInFlight =
+      state.messageCenterSuppressionFlushInFlight.has(suppressionKey);
+    checkbox.checked = !!state.messageCenter.suppressAutoOpenToday || pendingSuppression;
+    checkbox.disabled = !!state.messageCenter.suppressAutoOpenToday || suppressionInFlight;
+  }
+
+  function clearMessageCenterDetail_() {
+    const icon = $('#messageCenterDetailIcon');
+    icon.className = 'message-center-detail-icon';
+    icon.innerHTML = '';
+    $('#messageCenterDetailType').textContent = '';
+    $('#messageCenterDetailTitle').textContent = '';
+    $('#messageCenterDetailContent').textContent = '';
+    $('#messageCenterRewardBox').classList.add('hidden');
+    $('#messageCenterSuppressRow').classList.add('hidden');
+  }
+
+  function getMessageCenterTypeLabel_(messageType) {
+    const labels = {
+      ANNOUNCEMENT: '系統公告',
+      SPECIAL_TASK: '特殊任務',
+      REWARD_NOTIFICATION: '任務獎勵'
+    };
+
+    return labels[messageType] || '訊息';
+  }
+
+  function getMessageCenterIconClass_(message) {
+    if (!message) {
+      return '';
+    }
+
+    if (message.iconType === 'completed') {
+      return 'is-completed';
+    }
+
+    if (message.iconType === 'reward') {
+      return 'is-reward';
+    }
+
+    return '';
+  }
+
+  function getMessageCenterIconAssetKey_(message) {
+    if (!message) {
+      return '';
+    }
+
+    if (message.messageType === 'ANNOUNCEMENT') {
+      return 'systemAnnouncement';
+    }
+
+    if (message.messageType !== 'SPECIAL_TASK') {
+      return '';
+    }
+
+    return message.iconType === 'completed'
+      ? 'specialTaskCompleted'
+      : 'specialTaskInProgress';
+  }
+
+  function renderMessageCenterIcon_(container, message) {
+    if (!container) {
+      return;
+    }
+
+    const assetKey = getMessageCenterIconAssetKey_(message);
+    container.className = 'message-center-detail-icon ' + getMessageCenterIconClass_(message);
+    container.innerHTML = '';
+
+    if (assetKey) {
+      container.classList.add('has-image');
+      const image = document.createElement('img');
+      image.alt = '';
+      image.setAttribute('aria-hidden', 'true');
+      container.appendChild(image);
+      setManagedImageSource_(image, IMAGE_ASSETS[assetKey], assetKey, {
+        fallbackUrl: '',
+        onFallback: () => {
+          container.classList.remove('has-image');
+          container.innerHTML = getMessageCenterIconSvg_(message);
+        }
+      });
+      return;
+    }
+
+    container.innerHTML = getMessageCenterIconSvg_(message);
+  }
+
+  function getMessageCenterIconSvg_(message) {
+    const type = message && message.iconType ? message.iconType : 'announcement';
+
+    if (type === 'completed') {
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16.5 8.5"></path></svg>';
+    }
+
+    if (type === 'reward') {
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16v10H4z"></path><path d="M12 10v10M3 7h18v3H3zM12 7c-3 0-5-1.2-5-3 0-1.2.9-2 2.1-2 1.8 0 2.9 2.2 2.9 5ZM12 7c3 0 5-1.2 5-3 0-1.2-.9-2-2.1-2C13.1 2 12 4.2 12 7Z"></path></svg>';
+    }
+
+    return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v6"></path><circle cx="12" cy="16.5" r="1"></circle></svg>';
+  }
+
+  function markCurrentMessageRead_(autoShown) {
+    const message = getSelectedMessageCenterItem_();
+
+    if (message) {
+      markSelectedMessageRead_(message, autoShown);
+    }
+  }
+
+  function markSelectedMessageRead_(message, autoShown) {
+    if (!message || (message.isRead && !autoShown)) {
+      return;
+    }
+
+    message.isRead = true;
+    message.readAt = message.readAt || new Date().toISOString();
+
+    if (autoShown) {
+      message.autoShownAt = message.autoShownAt || new Date().toISOString();
+    }
+
+    state.selectedMessageKey = buildMessageCenterItemKey_(message);
+    renderMessageCenter_();
+
+    callServer('markPlayerMessageRead', {
+      messageType: message.messageType,
+      messageId: message.messageId,
+      messageVersion: Number(message.messageVersion || 1),
+      autoShown: !!autoShown
+    })
+      .then((res) => {
+        if (!isSuccess(res)) {
+          console.error(getResponseError(res, '標記訊息已讀失敗'));
+        }
+      })
+      .catch((error) => {
+        console.error(getErrorMessage(error));
+      });
+  }
+
+  function handleMessageCenterSuppressChange_(event) {
+    const checkbox = event.currentTarget;
+    const message = getSelectedMessageCenterItem_();
+
+    if (!message) {
+      checkbox.checked = false;
+      return;
+    }
+
+    if (
+      message.messageType !== 'ANNOUNCEMENT' &&
+      message.messageType !== 'SPECIAL_TASK'
+    ) {
+      checkbox.checked = false;
+      return;
+    }
+
+    if (state.messageCenter && state.messageCenter.suppressAutoOpenToday) {
+      checkbox.checked = true;
+      checkbox.disabled = true;
+      return;
+    }
+
+    const record = buildCurrentMessageCenterSuppressionRecord_();
+    const key = buildMessageCenterSuppressionStorageKey_(record);
+
+    if (!record.playerId || !record.suppressDate) {
+      checkbox.checked = false;
+      return;
+    }
+
+    if (state.messageCenterSuppressionFlushInFlight.has(key)) {
+      checkbox.checked = true;
+      checkbox.disabled = true;
+      return;
+    }
+
+    if (checkbox.checked) {
+      state.pendingMessageCenterSuppressions.set(key, record);
+      return;
+    }
+
+    state.pendingMessageCenterSuppressions.delete(key);
+    state.messageCenterSuppressionRetryAttempts.delete(key);
+    removeMessageCenterSuppressionRetry_(record);
+  }
+
+  function getMessageSuppressionDateKey_() {
+    const centerDate = String(
+      state.messageCenter && state.messageCenter.currentDate || ''
+    ).trim();
+
+    if (centerDate) {
+      return centerDate;
+    }
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return [year, month, day].join('-');
+  }
+
+  function buildCurrentMessageCenterSuppressionRecord_() {
+    return {
+      scope: 'MESSAGE_CENTER',
+      playerId: String(state.currentPlayer && state.currentPlayer.playerId || ''),
+      suppressDate: getMessageSuppressionDateKey_()
+    };
+  }
+
+  function buildMessageCenterSuppressionStorageKey_(record) {
+    record = record || {};
+
+    return [
+      String(record.playerId || ''),
+      'MESSAGE_CENTER',
+      String(record.suppressDate || '')
+    ].join('::');
+  }
+
+  function readMessageCenterSuppressionRetryQueue_() {
+    try {
+      const raw = localStorage.getItem(MESSAGE_SUPPRESSION_RETRY_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+
+      return (Array.isArray(parsed) ? parsed : []).filter((record) => {
+        return record && String(record.scope || '') === 'MESSAGE_CENTER';
+      });
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function writeMessageCenterSuppressionRetryQueue_(records) {
+    const unique = new Map();
+
+    (Array.isArray(records) ? records : []).forEach((record) => {
+      if (!record || String(record.scope || '') !== 'MESSAGE_CENTER') {
+        return;
+      }
+
+      const key = buildMessageCenterSuppressionStorageKey_(record);
+      if (key) {
+        unique.set(key, record);
+      }
+    });
+
+    try {
+      if (!unique.size) {
+        localStorage.removeItem(MESSAGE_SUPPRESSION_RETRY_KEY);
+        return;
+      }
+
+      localStorage.setItem(
+        MESSAGE_SUPPRESSION_RETRY_KEY,
+        JSON.stringify(Array.from(unique.values()))
+      );
+    } catch (error) {
+      console.error('暫存訊息中心今日不再顯示重試資料失敗', getErrorMessage(error));
+    }
+  }
+
+  function persistMessageCenterSuppressionRetry_(record) {
+    const queue = readMessageCenterSuppressionRetryQueue_();
+    queue.push(record);
+    writeMessageCenterSuppressionRetryQueue_(queue);
+  }
+
+  function stagePendingMessageCenterSuppressionForRetry_() {
+    const playerId = String(state.currentPlayer && state.currentPlayer.playerId || '');
+    const currentDate = getMessageSuppressionDateKey_();
+
+    if (!playerId || !state.pendingMessageCenterSuppressions.size) {
+      return;
+    }
+
+    state.pendingMessageCenterSuppressions.forEach((record) => {
+      if (
+        String(record.playerId || '') === playerId &&
+        String(record.suppressDate || '') === currentDate
+      ) {
+        persistMessageCenterSuppressionRetry_(record);
+      }
+    });
+  }
+
+  function applyQueuedMessageCenterSuppressionLocally_() {
+    const playerId = String(state.currentPlayer && state.currentPlayer.playerId || '');
+    const center = state.messageCenter || createEmptyMessageCenterState_();
+    const currentDate = String(center.currentDate || getMessageSuppressionDateKey_());
+
+    if (!playerId || !currentDate) {
+      return;
+    }
+
+    const activeQueue = readMessageCenterSuppressionRetryQueue_().filter((record) => {
+      return String(record.suppressDate || '') === currentDate;
+    });
+
+    // 清除過期日期與舊版「單一訊息 suppression」資料。
+    writeMessageCenterSuppressionRetryQueue_(activeQueue);
+
+    const localRecord = activeQueue.find((record) => {
+      return String(record.playerId || '') === playerId;
+    });
+
+    if (!localRecord) {
+      return;
+    }
+
+    const key = buildMessageCenterSuppressionStorageKey_(localRecord);
+
+    if (!state.pendingMessageCenterSuppressions.has(key)) {
+      state.pendingMessageCenterSuppressions.set(key, localRecord);
+    }
+
+    // 「今日不再自動顯示」是整個訊息中心層級，不改動任何訊息的未讀狀態。
+    center.suppressAutoOpenToday = true;
+    center.shouldAutoOpen = false;
+  }
+
+  function removeMessageCenterSuppressionRetry_(record) {
+    const targetKey = buildMessageCenterSuppressionStorageKey_(record);
+    const queue = readMessageCenterSuppressionRetryQueue_().filter((item) => {
+      return buildMessageCenterSuppressionStorageKey_(item) !== targetKey;
+    });
+    writeMessageCenterSuppressionRetryQueue_(queue);
+  }
+
+  function scheduleMessageCenterSuppressionRetry_() {
+    if (state.messageCenterSuppressionRetryTimer || !state.sessionToken) {
+      return;
+    }
+
+    state.messageCenterSuppressionRetryTimer = window.setTimeout(() => {
+      state.messageCenterSuppressionRetryTimer = null;
+      flushPendingMessageCenterSuppression_();
+    }, 5000);
+  }
+
+  function retryPendingMessageCenterSuppression_() {
+    const playerId = String(state.currentPlayer && state.currentPlayer.playerId || '');
+    const currentDate = getMessageSuppressionDateKey_();
+
+    if (!playerId || !state.sessionToken) {
+      return;
+    }
+
+    const activeQueue = readMessageCenterSuppressionRetryQueue_().filter((record) => {
+      return String(record.suppressDate || '') === currentDate;
+    });
+    writeMessageCenterSuppressionRetryQueue_(activeQueue);
+
+    activeQueue
+      .filter((record) => String(record.playerId || '') === playerId)
+      .forEach((record) => {
+        const key = buildMessageCenterSuppressionStorageKey_(record);
+
+        if (!state.pendingMessageCenterSuppressions.has(key)) {
+          state.pendingMessageCenterSuppressions.set(key, record);
+        }
+      });
+
+    applyQueuedMessageCenterSuppressionLocally_();
+    flushPendingMessageCenterSuppression_();
+  }
+
+  function markMessageCenterSuppressedLocally_(record) {
+    const center = state.messageCenter || createEmptyMessageCenterState_();
+    center.suppressAutoOpenToday = true;
+    center.shouldAutoOpen = false;
+    renderMessageCenter_();
+  }
+
+  function flushPendingMessageCenterSuppression_() {
+    const playerId = String(state.currentPlayer && state.currentPlayer.playerId || '');
+    const currentDate = getMessageSuppressionDateKey_();
+
+    if (!playerId || !state.sessionToken || !state.pendingMessageCenterSuppressions.size) {
+      return;
+    }
+
+    Array.from(state.pendingMessageCenterSuppressions.entries()).forEach(([key, record]) => {
+      if (String(record.suppressDate || '') !== currentDate) {
+        state.pendingMessageCenterSuppressions.delete(key);
+        removeMessageCenterSuppressionRetry_(record);
+        return;
+      }
+
+      if (
+        String(record.playerId || '') !== playerId ||
+        state.messageCenterSuppressionFlushInFlight.has(key)
+      ) {
+        return;
+      }
+
+      const attempts = Number(state.messageCenterSuppressionRetryAttempts.get(key) || 0);
+
+      if (attempts >= 3) {
+        return;
+      }
+
+      persistMessageCenterSuppressionRetry_(record);
+      state.messageCenterSuppressionFlushInFlight.add(key);
+
+      callServer('suppressPlayerMessageToday', {})
+        .then((res) => {
+          if (!isSuccess(res)) {
+            throw new Error(getResponseError(res, '更新訊息中心今日顯示設定失敗'));
+          }
+
+          state.pendingMessageCenterSuppressions.delete(key);
+          state.messageCenterSuppressionRetryAttempts.delete(key);
+          removeMessageCenterSuppressionRetry_(record);
+          markMessageCenterSuppressedLocally_(record);
+        })
+        .catch((error) => {
+          const nextAttempts = attempts + 1;
+          state.messageCenterSuppressionRetryAttempts.set(key, nextAttempts);
+          console.error('背景儲存訊息中心今日不再顯示失敗', getErrorMessage(error));
+
+          if (nextAttempts < 3) {
+            scheduleMessageCenterSuppressionRetry_();
+          }
+        })
+        .finally(() => {
+          state.messageCenterSuppressionFlushInFlight.delete(key);
+        });
+    });
   }
 
   function openAvatarModal() {
@@ -1641,13 +2638,21 @@ const STORAGE_KEY = 'yct_current_player';
     }
 
     setLoading(true, '建立活力組...');
+    state.pendingGroupCreateSignature = groupName;
+    state.pendingGroupCreateRequestId = getPendingMutationRequestId_(
+      'group-create', groupName
+    );
 
     callServer('createVitalGroup', {
       playerId: state.currentPlayer.playerId,
-      groupName: groupName
+      groupName: groupName,
+      requestId: state.pendingGroupCreateRequestId
     })
       .then((res) => {
         if (!isSuccess(res)) {
+          settlePendingMutationRequest_(
+            'group-create', state.pendingGroupCreateRequestId, res
+          );
           setResultMessage(
             '#vitalGroupsMessage',
             getResponseError(res, '建立活力組失敗')
@@ -1656,6 +2661,11 @@ const STORAGE_KEY = 'yct_current_player';
         }
 
         $('#createVitalGroupName').value = '';
+        clearPendingMutationRequestId_(
+          'group-create', state.pendingGroupCreateRequestId
+        );
+        state.pendingGroupCreateRequestId = '';
+        state.pendingGroupCreateSignature = '';
         invalidateByRule_('groupChanged');
         setResultMessage('#vitalGroupsMessage', res.data.message || '活力組已建立', true);
         loadVitalGroups();
@@ -1861,13 +2871,17 @@ const STORAGE_KEY = 'yct_current_player';
           state.currentCycleId = cycleId;
         }
 
+        state.homeSyncToken = String(
+          data.syncToken || state.homeSyncToken || ''
+        ).trim();
+        state.businessDate = String(
+          data.businessDate || getTaipeiBusinessDate_()
+        ).trim();
+
         setCache_('dashboard', data);
 
-        if (
-          data.taskConfig &&
-          typeof window.applyRuntimeTaskSettingsFromDashboard === 'function'
-        ) {
-          window.applyRuntimeTaskSettingsFromDashboard(data.taskConfig);
+        if (data.taskConfig) {
+          applyTaskConfiguration_(data.taskConfig);
         }
 
         if (data.player) {
@@ -1892,6 +2906,7 @@ const STORAGE_KEY = 'yct_current_player';
           : null;
         state.chestSummary = data.chestSummary || createEmptyChestSummary();
         setCache_('chestSummary', state.chestSummary);
+        applyMessageCenterData_(data.messageCenter, true);
 
         renderPlayer(state.currentPlayer);
         renderHomeChestSummary(state.chestSummary);
@@ -1915,6 +2930,14 @@ const STORAGE_KEY = 'yct_current_player';
   function renderDashboardData_(data) {
     data = data || {};
 
+    state.homeSyncToken = String(
+      data.syncToken || state.homeSyncToken || ''
+    ).trim();
+    state.businessDate = String(
+      data.businessDate || state.businessDate ||
+      getTaipeiBusinessDate_()
+    ).trim();
+
     const cycleId = data.cycleId ||
       (data.cycle && data.cycle.cycleId) ||
       state.currentCycleId;
@@ -1923,11 +2946,8 @@ const STORAGE_KEY = 'yct_current_player';
       state.currentCycleId = cycleId;
     }
 
-    if (
-      data.taskConfig &&
-      typeof window.applyRuntimeTaskSettingsFromDashboard === 'function'
-    ) {
-      window.applyRuntimeTaskSettingsFromDashboard(data.taskConfig);
+    if (data.taskConfig) {
+      applyTaskConfiguration_(data.taskConfig);
     }
 
     if (data.player) {
@@ -1952,6 +2972,7 @@ const STORAGE_KEY = 'yct_current_player';
       : null;
     state.chestSummary = data.chestSummary || createEmptyChestSummary();
     setCache_('chestSummary', state.chestSummary);
+    applyMessageCenterData_(data.messageCenter, true);
 
     renderPlayer(state.currentPlayer);
     renderHomeChestSummary(state.chestSummary);
@@ -2055,7 +3076,7 @@ const STORAGE_KEY = 'yct_current_player';
     const contribution = Number(player.totalScore || 0);
     const displayName = player.displayName || player.playerName || '活力人';
     const groupSuffix = player.groupName
-      ? '（' + player.groupName + '小組）'
+      ? '（' + player.groupName + '）'
       : '';
 
     $('#homePlayerName').textContent = displayName + groupSuffix;
@@ -2065,12 +3086,6 @@ const STORAGE_KEY = 'yct_current_player';
 
     $('#homeContributionText').textContent = formatNumber(contribution);
 
-    const contributionMeter = $('#homeContributionMeter');
-
-    if (contributionMeter) {
-      contributionMeter.style.width =
-        Math.min(100, Math.round((contribution / 1000) * 100)) + '%';
-    }
 
     $('#myPlayerName').textContent = displayName;
     $('#myGroupName').textContent = buildHandbookAffiliationText(player);
@@ -2379,6 +3394,23 @@ const STORAGE_KEY = 'yct_current_player';
           'accountProfile'
         ]);
 
+        if (data.groupJourney) {
+          state.groupJourney = data.groupJourney;
+
+          if (state.currentPlayer) {
+            state.currentPlayer = Object.assign({}, state.currentPlayer, {
+              totalScore: Number(
+                data.groupJourney.myContributionScore ||
+                state.currentPlayer.totalScore ||
+                0
+              )
+            });
+          }
+
+          setCache_('journey', data.groupJourney);
+          renderGroupJourney(state.groupJourney);
+        }
+
         state.selectedChestDetail = Object.assign({}, selected, {
           hasClaimed: true
         });
@@ -2577,6 +3609,12 @@ const STORAGE_KEY = 'yct_current_player';
 
     const editingPostId = String(state.editingGroupPostId || '');
     const method = editingPostId ? 'updateGroupPost' : 'createGroupPost';
+    if (!editingPostId) {
+      state.pendingGroupPostCreateSignature = content;
+      state.pendingGroupPostCreateRequestId = getPendingMutationRequestId_(
+        'group-post-create', content
+      );
+    }
 
     setLoading(true, editingPostId ? '儲存公告...' : '發布公告...');
 
@@ -2584,10 +3622,14 @@ const STORAGE_KEY = 'yct_current_player';
       playerId: state.currentPlayer.playerId,
       postId: editingPostId,
       postType: 'announcement',
-      content: content
+      content: content,
+      requestId: editingPostId ? '' : state.pendingGroupPostCreateRequestId
     })
       .then((res) => {
         if (!isSuccess(res)) {
+          if (!editingPostId) settlePendingMutationRequest_(
+            'group-post-create', state.pendingGroupPostCreateRequestId, res
+          );
           setResultMessage(
             '#groupPostMessage',
             getResponseError(res, editingPostId ? '儲存失敗' : '發布失敗')
@@ -2612,6 +3654,11 @@ const STORAGE_KEY = 'yct_current_player';
         }
 
         resetGroupPostEditor();
+        clearPendingMutationRequestId_(
+          'group-post-create', state.pendingGroupPostCreateRequestId
+        );
+        state.pendingGroupPostCreateRequestId = '';
+        state.pendingGroupPostCreateSignature = '';
         closeModal('groupPostModal');
         invalidateByRule_('groupAnnouncementsChanged');
         setResultMessage('#myMessage', res.data.message || '已發布', true);
@@ -2885,7 +3932,7 @@ const STORAGE_KEY = 'yct_current_player';
     $('#practiceModalHeading').textContent = config.title;
     $('#practiceModalDescription').textContent = config.description;
     $('#practiceModalReward').textContent = config.reward;
-    $('#practiceNote').value = '';
+    $('#practiceNote').value = String((state.dailyRecord || {}).note || '');
 
     $('#practiceSubmitBtn').textContent = done
       ? '今日已完成'
@@ -2915,7 +3962,6 @@ const STORAGE_KEY = 'yct_current_player';
 
     const payload = {
       playerId: state.currentPlayer.playerId,
-      recordDate: record.recordDate || formatLocalDate(new Date()),
       morningRevival: toBool(record.morningRevival),
       bibleReading: toBool(record.bibleReading),
       prayer: toBool(record.prayer),
@@ -2924,12 +3970,16 @@ const STORAGE_KEY = 'yct_current_player';
     };
 
     payload[config.field] = true;
+    const pendingDaily = beginPendingMutationRequest_('daily-practice', payload);
+    state.pendingDailyRequestId = pendingDaily.requestId;
+    payload.requestId = pendingDaily.requestId;
 
     setLoading(true, '儲存今日任務...');
 
     callServer('submitDailyPractice', payload)
       .then((res) => {
         if (!isSuccess(res)) {
+          settlePendingMutationRequest_('daily-practice', payload.requestId, res);
           setResultMessage(
             '#practiceModalMessage',
             getResponseError(res, '儲存失敗')
@@ -2938,6 +3988,8 @@ const STORAGE_KEY = 'yct_current_player';
         }
 
         state.dailyRecord = res.data.record || state.dailyRecord;
+        settlePendingMutationRequest_('daily-practice', payload.requestId, res);
+        state.pendingDailyRequestId = '';
         invalidateByRule_('dailyPracticeChanged');
 
         if (res.data.player) {
@@ -2968,19 +4020,19 @@ const STORAGE_KEY = 'yct_current_player';
       const labels = [];
 
       if (toBool(record.morningRevival)) {
-        labels.push('小組晨興');
+        labels.push(PRACTICE_CONFIG.morning.title);
       }
 
       if (toBool(record.bibleReading)) {
-        labels.push('個人讀經');
+        labels.push(PRACTICE_CONFIG.bible.title);
       }
 
       if (toBool(record.prayer)) {
-        labels.push('個人禱告');
+        labels.push(PRACTICE_CONFIG.prayer.title);
       }
 
       if (toBool(record.bookPursuit)) {
-        labels.push('書報追求');
+        labels.push(PRACTICE_CONFIG.book.title);
       }
 
       return [
@@ -3071,7 +4123,7 @@ const STORAGE_KEY = 'yct_current_player';
     $('#weeklyTaskModalHeading').textContent = config.title;
     $('#weeklyTaskModalDescription').textContent = config.description;
     $('#weeklyTaskModalReward').textContent = config.reward;
-    $('#weeklyTaskNote').value = '';
+    $('#weeklyTaskNote').value = String((state.weeklyTaskRecord || {}).note || '');
 
     $('#weeklyTaskSubmitBtn').textContent = done
       ? '本週已完成'
@@ -3101,7 +4153,6 @@ const STORAGE_KEY = 'yct_current_player';
 
     const payload = {
       playerId: state.currentPlayer.playerId,
-      weekKey: record.weekKey || '',
       outreachVisit: toBool(record.outreachVisit),
       smallGroup: toBool(record.smallGroup),
       prayerMeeting: toBool(record.prayerMeeting),
@@ -3110,12 +4161,16 @@ const STORAGE_KEY = 'yct_current_player';
     };
 
     payload[config.field] = true;
+    const pendingMeeting = beginPendingMutationRequest_('meeting-practice', payload);
+    state.pendingWeeklyRequestId = pendingMeeting.requestId;
+    payload.requestId = pendingMeeting.requestId;
 
     setLoading(true, '儲存本週任務...');
 
     callServer('submitMeetingPractice', payload)
       .then((res) => {
         if (!isSuccess(res)) {
+          settlePendingMutationRequest_('meeting-practice', payload.requestId, res);
           setResultMessage(
             '#weeklyTaskModalMessage',
             getResponseError(res, '儲存失敗')
@@ -3124,6 +4179,8 @@ const STORAGE_KEY = 'yct_current_player';
         }
 
         state.weeklyTaskRecord = res.data.record || state.weeklyTaskRecord;
+        settlePendingMutationRequest_('meeting-practice', payload.requestId, res);
+        state.pendingWeeklyRequestId = '';
         invalidateByRule_('meetingPracticeChanged');
 
         if (res.data.player) {
@@ -3154,19 +4211,19 @@ const STORAGE_KEY = 'yct_current_player';
       const labels = [];
 
       if (toBool(record.outreachVisit)) {
-        labels.push('外出探訪');
+        labels.push(WEEKLY_TASK_CONFIG.outreachVisit.title);
       }
 
       if (toBool(record.smallGroup)) {
-        labels.push('小排聚會');
+        labels.push(WEEKLY_TASK_CONFIG.smallGroup.title);
       }
 
       if (toBool(record.prayerMeeting)) {
-        labels.push('禱告聚會');
+        labels.push(WEEKLY_TASK_CONFIG.prayerMeeting.title);
       }
 
       if (toBool(record.lordDayMeeting)) {
-        labels.push('主日聚會');
+        labels.push(WEEKLY_TASK_CONFIG.lordDayMeeting.title);
       }
 
       return [
@@ -3591,12 +4648,23 @@ function clearPrayerAutoScroll(selector) {
   function submitPrayerCreate(event) {
     event.preventDefault();
 
+    const prayerSignature = [
+      $('#prayerTitle').value.trim(),
+      $('#prayerContent').value.trim(),
+      $('#prayerVisibility').value
+    ].join('\u0001');
+    state.pendingPrayerCreateSignature = prayerSignature;
+    state.pendingPrayerCreateRequestId = getPendingMutationRequestId_(
+      'prayer-create', prayerSignature
+    );
     const payload = {
       playerId: state.currentPlayer.playerId,
       title: $('#prayerTitle').value.trim(),
       content: $('#prayerContent').value.trim(),
-      visibility: $('#prayerVisibility').value
+      visibility: $('#prayerVisibility').value,
+      requestId: state.pendingPrayerCreateRequestId || createClientRequestId_()
     };
+    state.pendingPrayerCreateRequestId = payload.requestId;
 
     if (!payload.title || !payload.content) {
       setResultMessage(
@@ -3623,6 +4691,9 @@ function clearPrayerAutoScroll(selector) {
     callServer('createPrayerRequest', payload)
       .then((res) => {
         if (!isSuccess(res)) {
+          settlePendingMutationRequest_(
+            'prayer-create', state.pendingPrayerCreateRequestId, res
+          );
           setResultMessage(
             '#prayerCreateMessage',
             getResponseError(res, '發出失敗')
@@ -3631,11 +4702,14 @@ function clearPrayerAutoScroll(selector) {
         }
 
         closeModal('prayerCreateModal');
+        clearPendingMutationRequestId_(
+          'prayer-create', state.pendingPrayerCreateRequestId
+        );
+        state.pendingPrayerCreateRequestId = '';
+        state.pendingPrayerCreateSignature = '';
 
-        invalidateByRule_('prayerChanged');
-        refreshProfileOnly();
+        invalidateByRule_('prayerContentChanged');
         loadPrayerPage(false);
-        refreshDashboard(false);
       })
       .catch((error) => {
         setResultMessage('#prayerCreateMessage', getErrorMessage(error));
@@ -4001,11 +5075,21 @@ function clearPrayerAutoScroll(selector) {
 
     setLoading(true, '送出代禱...');
 
-    callServer('respondPrayerRequest', {
+    const responsePayload = {
       requestId: requestId,
       responderId: state.currentPlayer.playerId
-    })
+    };
+    const pendingResponse = beginPendingMutationRequest_(
+      'prayer-response:' + requestId, responsePayload
+    );
+    state.pendingPrayerResponseRequestIds[requestId] = pendingResponse.requestId;
+    responsePayload.submissionRequestId = pendingResponse.requestId;
+    callServer('respondPrayerRequest', responsePayload)
       .then((res) => {
+        if (settlePendingMutationRequest_(
+            'prayer-response:' + requestId, pendingResponse.requestId, res)) {
+          delete state.pendingPrayerResponseRequestIds[requestId];
+        }
         handlePrayerRespondResult(res, '代禱完成');
       })
       .catch((error) => {
@@ -4027,10 +5111,9 @@ function clearPrayerAutoScroll(selector) {
 
     closeModal('prayerDetailModal');
 
-    invalidateByRule_('prayerChanged');
+    invalidateByRule_('prayerResponseChanged');
     loadPrayerPage(false);
     refreshDashboard(false);
-    refreshProfileOnly();
   }
 
   function handlePrayerRespondResult(res, fallback) {
@@ -4054,10 +5137,9 @@ function clearPrayerAutoScroll(selector) {
     }
 
     setResultMessage('#prayerDetailMessage', '', false);
-    invalidateByRule_('prayerChanged');
+    invalidateByRule_('prayerResponseChanged');
     loadPrayerPage(false);
     refreshDashboard(false);
-    refreshProfileOnly();
   }
 
   function openMyPrayerDetail(requestId) {
@@ -4218,11 +5300,10 @@ function clearPrayerAutoScroll(selector) {
         }
 
         closeModal('prayerEditModal');
-        invalidateByRule_('prayerChanged');
+        invalidateByRule_('prayerContentChanged');
         openMyPrayerDetail(request.requestId);
         loadMyPrayerRequests();
         loadPrayerPage(false);
-        refreshDashboard(false);
       })
       .catch((error) => {
         setResultMessage('#prayerEditMessage', getErrorMessage(error));
@@ -4254,10 +5335,9 @@ function clearPrayerAutoScroll(selector) {
 
         closeModal('myPrayerDetailModal');
 
-        invalidateByRule_('prayerChanged');
+        invalidateByRule_('prayerContentChanged');
         loadMyPrayerRequests();
         loadPrayerPage(false);
-        refreshDashboard(false);
       })
       .catch((error) => {
         setResultMessage('#myPrayerDetailMessage', getErrorMessage(error));
@@ -4457,6 +5537,10 @@ function clearPrayerAutoScroll(selector) {
       formatNumber(memberCount),
       ' 位組員',
       '</p>',
+      '<div class="group-contribution-breakdown">',
+      '<span>合作取得 <strong>' + formatNumber(data.cooperativeScore) + '</strong> 點</span>',
+      '<span>個人貢獻 <strong>' + formatNumber(data.personalContributionTotal) + '</strong> 點</span>',
+      '</div>',
       '</section>'
     ].join('');
 
@@ -4494,7 +5578,7 @@ function clearPrayerAutoScroll(selector) {
       summaryHtml,
       '<section class="group-contribution-section">',
       '<div class="group-contribution-list-head">',
-      '<h3>組員貢獻</h3>',
+      '<h3>個人貢獻</h3>',
       '<span>依點數排序</span>',
       '</div>',
       '<div class="group-contribution-list">',
@@ -4536,64 +5620,17 @@ function clearPrayerAutoScroll(selector) {
 
   function openAllPracticeHistoryModal() {
     if (isCacheValid_('practiceHistory')) {
-      const cached = getCache_('practiceHistory') || {};
-
-      openInfoModal(
-        '我的同行足跡',
-        [
-          '<section class="info-block">',
-          '<h3>每日任務</h3>',
-          renderDailyHistoryHtml(cached.daily || []),
-          '</section>',
-
-          '<section class="info-block">',
-          '<h3>本週任務</h3>',
-          renderWeeklyTaskHistoryHtml(cached.weekly || []),
-          '</section>'
-        ].join('')
-      );
+      showFootprintDashboard_(getCache_('practiceHistory') || {});
       return;
     }
 
-    setLoading(true, '讀取操練紀錄...');
-
-    Promise.all([
-      loadOnce_('dailyPractice', () => callServer(
-        'getDailyPracticeHistory',
-        state.currentPlayer.playerId
-      )),
-      loadOnce_('meetingPractice', () => callServer(
-        'getMeetingPracticeHistory',
-        state.currentPlayer.playerId
-      ))
-    ])
-      .then(([dailyRes, weeklyRes]) => {
-        const daily = isSuccess(dailyRes)
-          ? dailyRes.data.records || []
-          : [];
-
-        const weekly = isSuccess(weeklyRes)
-          ? weeklyRes.data.records || []
-          : [];
-        setCache_('practiceHistory', {
-          daily: daily,
-          weekly: weekly
-        });
-
-        openInfoModal(
-          '我的同行足跡',
-          [
-            '<section class="info-block">',
-            '<h3>每日任務</h3>',
-            renderDailyHistoryHtml(daily),
-            '</section>',
-
-            '<section class="info-block">',
-            '<h3>本週任務</h3>',
-            renderWeeklyTaskHistoryHtml(weekly),
-            '</section>'
-          ].join('')
-        );
+    setLoading(true, '讀取同行足跡彙總...');
+    callServer('getMyFootprintDashboard')
+      .then((res) => {
+        if (!isSuccess(res)) throw new Error(getResponseError(res, '足跡讀取失敗'));
+        const dashboard = res.data || {};
+        setCache_('practiceHistory', dashboard);
+        showFootprintDashboard_(dashboard);
       })
       .catch((error) => {
         openInfoModal(
@@ -4606,6 +5643,98 @@ function clearPrayerAutoScroll(selector) {
       .finally(() => {
         setLoading(false);
       });
+  }
+
+  function showFootprintDashboard_(dashboard) {
+    openInfoModal('我的同行足跡', renderFootprintDashboardHtml_(dashboard || {}));
+    bindFootprintDayButtons_(dashboard || {});
+  }
+
+  function renderFootprintDashboardHtml_(dashboard) {
+    const month = dashboard.monthly || {};
+    const stats = [
+      ['完成天數', month.completedDays, '📅'],
+      ['讀經天數', month.bibleDays, '📖'],
+      ['禱告天數', month.prayerDays, '🙏'],
+      ['晨興天數', month.morningDays, '🌅'],
+      ['聚會次數', month.meetingCount, '🏠'],
+      ['探訪次數', month.visitCount, '👣'],
+      ['最長連續', month.longestStreak, '🔥'],
+      ['本月點數', month.totalScore, '⭐']
+    ].map((item) => [
+      '<article class="footprint-stat">',
+      '<span aria-hidden="true">', item[2], '</span>',
+      '<strong>', formatNumber(item[1] || 0), '</strong>',
+      '<small>', escapeHtml(item[0]), '</small>',
+      '</article>'
+    ].join('')).join('');
+    const daily = Array.isArray(dashboard.daily) ? dashboard.daily : [];
+    const heat = daily.slice().reverse().map((day) => {
+      const level = Math.max(0, Math.min(4, Number(day.completedCount || 0)));
+      const badges = (day.hasChest ? ' 🎁' : '') + (day.hasSpecialTask ? ' ✨' : '') +
+        (String(day.streakStatus || '') === 'FULL' ? ' 🔥' : '');
+      return [
+        '<button class="footprint-day level-', level, '" type="button" data-footprint-day="',
+        escapeHtml(day.recordDate || ''), '" aria-label="', escapeHtml(day.recordDate || ''),
+        ' 完成 ', level, ' 項">',
+        '<span>', escapeHtml(String(day.recordDate || '').slice(8,10)), '</span>',
+        '<small>', level ? level + '/4' : '—', badges, '</small>',
+        '</button>'
+      ].join('');
+    }).join('');
+    const weekly = Array.isArray(dashboard.weekly) ? dashboard.weekly : [];
+    const route = weekly.map((week, index) => {
+      const high = Number(week.completedDays || 0) >= 5;
+      const partial = Number(week.completedDays || 0) > 0;
+      const stateClass = high ? 'is-high' : (partial ? 'is-partial' : 'is-empty');
+      return [
+        '<article class="footprint-week ', stateClass, '">',
+        '<div class="footprint-week-marker">', high ? '★' : (partial ? '●' : '○'), '</div>',
+        '<div><strong>', escapeHtml(week.weekKey || '本週'), '</strong>',
+        '<p>📖 ', formatNumber(week.bibleDays || 0), '天　🙏 ', formatNumber(week.prayerDays || 0),
+        '天　🌅 ', formatNumber(week.morningDays || 0), '天</p>',
+        '<p>', week.groupMeetingCompleted ? '✅ 小排' : '▫️ 小排', '　',
+        week.prayerMeetingCompleted ? '✅ 禱告聚會' : '▫️ 禱告聚會', '　',
+        week.lordDayCompleted ? '✅ 主日' : '▫️ 主日', '　',
+        week.visitCompleted ? '✅ 探訪' : '▫️ 探訪', '</p>',
+        '<small>本週 ', formatNumber(week.weeklyScore || 0), ' 點',
+        Number(week.chestCount || 0) ? '　🎁 ' + formatNumber(week.chestCount) : '',
+        Number(week.specialTaskCount || 0) ? '　✨ ' + formatNumber(week.specialTaskCount) : '',
+        '</small></div></article>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="footprint-dashboard">',
+      '<section class="footprint-section"><div class="footprint-heading"><h3>本月成果卡</h3><span>',
+      escapeHtml(month.monthKey || ''), '</span></div><div class="footprint-stats">', stats, '</div></section>',
+      '<section class="footprint-section"><div class="footprint-heading"><h3>月曆熱度圖</h3><span>最近30天</span></div>',
+      heat ? '<div class="footprint-heatmap">' + heat + '</div>' : '<div class="empty-card">目前還沒有每日足跡</div>',
+      '</section>',
+      '<section class="footprint-section"><div class="footprint-heading"><h3>每週足跡路線</h3><span>最近20週</span></div>',
+      route ? '<div class="footprint-route">' + route + '</div>' : '<div class="empty-card">目前還沒有每週足跡</div>',
+      '</section></div>'
+    ].join('');
+  }
+
+  function bindFootprintDayButtons_(dashboard) {
+    const rows = Array.isArray(dashboard.daily) ? dashboard.daily : [];
+    const byDate = {};
+    rows.forEach((row) => { byDate[String(row.recordDate || '')] = row; });
+    $$('[data-footprint-day]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const row = byDate[String(button.dataset.footprintDay || '')] || {};
+        openInfoModal('每日足跡', [
+          '<section class="info-block footprint-day-detail"><h3>', escapeHtml(row.recordDate || ''), '</h3>',
+          '<p>', row.morningCompleted ? '✅ 晨興' : '▫️ 晨興', '　',
+          row.bibleCompleted ? '✅ 讀經' : '▫️ 讀經', '　',
+          row.prayerCompleted ? '✅ 禱告' : '▫️ 禱告', '　',
+          row.readingCompleted ? '✅ 書報' : '▫️ 書報', '</p>',
+          '<strong>當日 ', formatNumber(row.dailyScore || 0), ' 點</strong>',
+          row.noteSummary ? '<p>' + escapeHtml(row.noteSummary) + '</p>' : '',
+          '</section>'
+        ].join(''));
+      });
+    });
   }
 
   function openLogoutConfirm() {
@@ -4679,6 +5808,18 @@ function clearPrayerAutoScroll(selector) {
     state.homePrayerItems = [];
     state.homeGroupPosts = [];
     state.homeGroupMemberCount = 0;
+    state.messageCenter = createEmptyMessageCenterState_();
+    state.messageCenterFilter = 'ANNOUNCEMENT';
+    state.selectedMessageKey = '';
+    state.messageCenterAutoOpenedKey = '';
+    state.pendingMessageCenterSuppressions.clear();
+    state.messageCenterSuppressionFlushInFlight.clear();
+    state.messageCenterSuppressionRetryAttempts.clear();
+    if (state.messageCenterSuppressionRetryTimer) {
+      window.clearTimeout(state.messageCenterSuppressionRetryTimer);
+      state.messageCenterSuppressionRetryTimer = null;
+    }
+    renderHomeMessageBadge_();
     state.prayerCarouselItems = [];
     state.explorePrayerItems = [];
     state.myPrayerItems = [];
@@ -4858,6 +5999,133 @@ function clearPrayerAutoScroll(selector) {
     showAuthMessage('登入狀態已失效，請重新登入。');
   }
 
+  function createClientRequestId_() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return 'REQ-' + Date.now().toString(36) + '-' +
+      Math.random().toString(36).slice(2, 12);
+  }
+
+  function getPendingMutationStorageKey_(kind) {
+    const playerId = String(
+      state.currentPlayer && state.currentPlayer.playerId || 'anonymous'
+    );
+    return 'vital-pending-mutation::' + playerId + '::' + String(kind || '');
+  }
+
+  function digestPendingMutationPayload_(value) {
+    const text = typeof value === 'string'
+      ? value : buildPendingMutationSignature_(value);
+    let first = 2166136261;
+    let second = 2246822519;
+    for (let index = 0; index < text.length; index += 1) {
+      const code = text.charCodeAt(index);
+      first = Math.imul(first ^ code, 16777619) >>> 0;
+      second = Math.imul(second ^ code, 3266489917) >>> 0;
+    }
+    return 'pending-v1-' + first.toString(16).padStart(8, '0') +
+      second.toString(16).padStart(8, '0');
+  }
+
+  function cleanupExpiredPendingMutationRequests_() {
+    const now = Date.now();
+    try {
+      for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+        const key = window.localStorage.key(index);
+        if (!key || key.indexOf('vital-pending-mutation::') !== 0) continue;
+        let record = null;
+        try { record = JSON.parse(window.localStorage.getItem(key) || '{}'); }
+        catch (error) {}
+        if (!record || Number(record.expiresAt || 0) <= now) {
+          window.localStorage.removeItem(key);
+        }
+      }
+    } catch (error) {}
+  }
+
+  function getPendingMutationRequestId_(kind, signature) {
+    const storageKey = getPendingMutationStorageKey_(kind);
+    const payloadDigest = digestPendingMutationPayload_(signature);
+    const now = Date.now();
+    cleanupExpiredPendingMutationRequests_();
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(storageKey) || '{}');
+      if (String(saved.payloadDigest || '') === payloadDigest && saved.requestId &&
+          Number(saved.expiresAt || 0) > now &&
+          String(saved.actionType || '') === String(kind || '')) {
+        return String(saved.requestId);
+      }
+    } catch (error) {}
+
+    const requestId = createClientRequestId_();
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify({
+        requestId: requestId,
+        payloadDigest: payloadDigest,
+        actionType: String(kind || ''),
+        createdAt: new Date(now).toISOString(),
+        expiresAt: now + PENDING_MUTATION_TTL_MS
+      }));
+    } catch (error) {}
+    return requestId;
+  }
+
+  function clearPendingMutationRequestId_(kind, requestId) {
+    const storageKey = getPendingMutationStorageKey_(kind);
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(storageKey) || '{}');
+      if (!requestId || String(saved.requestId || '') === String(requestId || '')) {
+        window.localStorage.removeItem(storageKey);
+      }
+    } catch (error) {
+      try { window.localStorage.removeItem(storageKey); } catch (ignored) {}
+    }
+  }
+
+  function normalizePendingMutationSignatureValue_(value) {
+    if (value === null || typeof value === 'undefined') return '';
+    if (Array.isArray(value)) return value.map(normalizePendingMutationSignatureValue_);
+    if (value && typeof value === 'object') {
+      return Object.keys(value).sort().reduce((result, key) => {
+        if (key !== 'requestId' && key !== 'sessionToken') {
+          result[key] = normalizePendingMutationSignatureValue_(value[key]);
+        }
+        return result;
+      }, {});
+    }
+    return value;
+  }
+
+  function buildPendingMutationSignature_(payload) {
+    return JSON.stringify(normalizePendingMutationSignatureValue_(payload || {}));
+  }
+
+  function beginPendingMutationRequest_(kind, payload) {
+    const signature = buildPendingMutationSignature_(payload);
+    return {
+      signature,
+      payloadDigest: digestPendingMutationPayload_(signature),
+      requestId: getPendingMutationRequestId_(kind, signature)
+    };
+  }
+
+  function isExplicitNonRetryableMutationResponse_(response) {
+    if (!response || isSuccess(response)) return false;
+    const code = String(response.code || response.errorCode || '').toUpperCase();
+    const message = String(response.message || response.error || '').toUpperCase();
+    return ['DATA_CONFLICT', 'VALIDATION_ERROR', 'FORBIDDEN', 'UNAUTHORIZED']
+      .indexOf(code) >= 0 || /(^|:)DATA_CONFLICT:/.test(message);
+  }
+
+  function settlePendingMutationRequest_(kind, requestId, response) {
+    if (isSuccess(response) || isExplicitNonRetryableMutationResponse_(response)) {
+      clearPendingMutationRequestId_(kind, requestId);
+      return true;
+    }
+    return false;
+  }
+
   function prepareServerCallArgs(functionName, args) {
     const list = Array.from(args || []);
 
@@ -4881,16 +6149,69 @@ function clearPrayerAutoScroll(selector) {
 
   function callServer(functionName, ...args) {
     const finalArgs = prepareServerCallArgs(functionName, args);
+    const isMutation = SERVER_MUTATION_APIS.has(functionName);
 
-    return window.GasBackend
-      .invoke(functionName, finalArgs)
-      .then((res) => {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      // GAS Web App 請求無法取消已開始的後端執行。讀取逾時可以安全重試；
+      // 寫入則等待正式 callback，避免畫面先宣告失敗後又重複送出。
+      const timeoutId = isMutation ? 0 : window.setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('伺服器回應逾時，請確認網路後再試一次'));
+      }, SERVER_READ_CALL_TIMEOUT_MS);
+
+      const clearCallTimeout = () => {
+        if (timeoutId) window.clearTimeout(timeoutId);
+      };
+
+      const resolveOnce = (res) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        clearCallTimeout();
+
         if (isSessionErrorResponse(res)) {
           handleSessionExpired();
         }
 
-        return res;
-      });
+        resolve(res);
+      };
+
+      const rejectOnce = (error) => {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        clearCallTimeout();
+        reject(error);
+      };
+
+      try {
+        window.GasBackend
+          .invoke(functionName, finalArgs)
+          .then(resolveOnce)
+          .catch(rejectOnce);
+      } catch (error) {
+        rejectOnce(error);
+      }
+    });
+  }
+
+  function getCacheTtlMs_(key) {
+    key = String(key || '').trim();
+
+    return Number(
+      Object.prototype.hasOwnProperty.call(
+        CACHE_POLICIES,
+        key
+      )
+        ? CACHE_POLICIES[key]
+        : CACHE_DEFAULT_TTL_MS
+    );
   }
 
   function getCacheScope_() {
@@ -4927,6 +6248,42 @@ function clearPrayerAutoScroll(selector) {
       return null;
     }
 
+    const currentBusinessDate = getTaipeiBusinessDate_();
+
+    if (
+      String(entry.businessDate || '') !==
+      currentBusinessDate
+    ) {
+      delete state.cache[key];
+      return null;
+    }
+
+    if (entry.loadingPromise) {
+      if (
+        Date.now() -
+        Number(entry.loadedAt || 0) <=
+        30000
+      ) {
+        return entry;
+      }
+
+      delete state.cache[key];
+      return null;
+    }
+
+    if (!entry.valid) {
+      delete state.cache[key];
+      return null;
+    }
+
+    if (
+      Number(entry.expiresAt || 0) > 0 &&
+      Date.now() >= Number(entry.expiresAt)
+    ) {
+      delete state.cache[key];
+      return null;
+    }
+
     return entry;
   }
 
@@ -4950,15 +6307,19 @@ function clearPrayerAutoScroll(selector) {
     }
 
     const scope = getCacheScope_();
+    const loadedAt = Date.now();
+    const ttlMs = getCacheTtlMs_(key);
 
     state.cache = state.cache || {};
     state.cache[key] = {
       data: data,
       valid: true,
-      loadedAt: Date.now(),
+      loadedAt: loadedAt,
+      expiresAt: loadedAt + ttlMs,
       loadingPromise: null,
       playerId: scope.playerId,
-      cycleId: scope.cycleId
+      cycleId: scope.cycleId,
+      businessDate: getTaipeiBusinessDate_()
     };
 
     return data;
@@ -5004,10 +6365,12 @@ function clearPrayerAutoScroll(selector) {
     state.cache[key] = {
       data: null,
       valid: false,
-      loadedAt: 0,
+      loadedAt: Date.now(),
+      expiresAt: 0,
       loadingPromise: promise,
       playerId: scope.playerId,
-      cycleId: scope.cycleId
+      cycleId: scope.cycleId,
+      businessDate: getTaipeiBusinessDate_()
     };
 
     return promise;
@@ -5037,11 +6400,21 @@ function clearPrayerAutoScroll(selector) {
         'chestSettingsForPlayer',
         'accountProfile'
       ],
-      prayerChanged: [
+      prayerContentChanged: [
         'prayerList',
-        'myPrayers',
+        'myPrayers'
+      ],
+      prayerResponseChanged: [
+        'prayerList',
         'dashboard',
-        'accountProfile'
+        'accountProfile',
+        'growth',
+        'journey',
+        'contribution',
+        'groupJourneyList',
+        'chestSummary',
+        'chestCollection',
+        'chestSettingsForPlayer'
       ],
       groupAnnouncementsChanged: [
         'groupAnnouncements',
