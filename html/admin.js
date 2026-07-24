@@ -3,7 +3,43 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
     const $ = (s) => document.querySelector(s);
     const $$ = (s) => [...document.querySelectorAll(s)];
 
-    document.addEventListener('DOMContentLoaded', () => { bindEvents(); restoreSession(); });
+    document.addEventListener('DOMContentLoaded', () => { initializeAdminLoginFieldProtection_(); bindEvents(); restoreSession(); });
+
+    function clearLockedAdminLoginField_(){
+      const field = $('#adminPasswordInput');
+      if(field && field.hasAttribute('readonly')) field.value = '';
+    }
+
+    function unlockAdminLoginField_(event){
+      const field = event.currentTarget;
+      if(!field.hasAttribute('readonly')) return;
+      field.removeAttribute('readonly');
+      field.value = '';
+    }
+
+    function lockAndClearAdminLoginField_(){
+      const field = $('#adminPasswordInput');
+      if(!field) return;
+      field.value = '';
+      field.setAttribute('readonly','');
+    }
+
+    function scheduleAdminLoginFieldClear_(){
+      [100,500,1000].forEach((delay) => window.setTimeout(clearLockedAdminLoginField_,delay));
+    }
+
+    function initializeAdminLoginFieldProtection_(){
+      const field = $('#adminPasswordInput');
+      if(!field) return;
+      field.addEventListener('focus',unlockAdminLoginField_);
+      field.addEventListener('pointerdown',unlockAdminLoginField_);
+      lockAndClearAdminLoginField_();
+      scheduleAdminLoginFieldClear_();
+      window.addEventListener('pageshow',() => {
+        clearLockedAdminLoginField_();
+        scheduleAdminLoginFieldClear_();
+      });
+    }
 
     function bindEvents(){
       $('#openAppBtn').addEventListener('click', openFrontend);
@@ -71,6 +107,8 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
     }
 
     function showLogin(){
+      lockAndClearAdminLoginField_();
+      scheduleAdminLoginFieldClear_();
       $('#loginView').classList.remove('hidden');
       $('#appView').classList.add('hidden');
       $('#logoutBtn').classList.add('hidden');
@@ -91,6 +129,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         if(!isSuccess(res)) return showMessage('#loginMessage', responseError(res,'登入失敗'),'error');
 
         state.token = res.data.adminToken || '';
+        lockAndClearAdminLoginField_();
         localStorage.setItem(ADMIN_STORAGE_KEY,state.token);
         showMessage(
           '#loginMessage',

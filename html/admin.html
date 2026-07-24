@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="../UI/app-icon.png">
   <link rel="apple-touch-icon" href="../UI/app-icon.png">
-  <link rel="manifest" href="manifest.webmanifest?v=20260724-github-v01321">
+  <link rel="manifest" href="manifest.webmanifest?v=20260724-github-v01321-loginfix1">
 <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,7 +13,7 @@
   <meta name="application-name" content="高雄青職｜活力同行">
   <meta name="theme-color" content="#8fd3ff">
   <title>高雄青職｜活力同行</title>
-  <link rel="stylesheet" href="admin.css?v=20260724-github-v01321">
+  <link rel="stylesheet" href="admin.css?v=20260724-github-v01321-loginfix1">
 </head>
 <body>
   <main class="shell">
@@ -24,7 +24,14 @@
 
     <section id="loginView" class="panel login-card">
       <h2>管理者登入</h2>
-      <label class="field">管理者登入密碼<input id="adminPasswordInput" type="password" placeholder="輸入管理者密碼"></label>
+      <label class="field">管理者登入密碼<input
+        id="adminPasswordInput"
+        name="admin-login-password-input"
+        type="password"
+        autocomplete="new-password"
+        readonly
+        placeholder="輸入管理者密碼"
+      ></label>
       <button id="loginBtn" class="btn primary" type="button">登入</button>
       <div id="loginMessage" class="message">請使用管理者密碼登入。首次遷移後請到設定頁更新密碼。</div>
     </section>
@@ -352,8 +359,8 @@
   </main>
 
   <div id="loading" class="loading hidden"><div class="loading-card"><div class="spinner"></div><span id="loadingText">處理中...</span></div></div>
-  <script src="runtime-settings.js?v=20260724-github-v01321"></script>
-  <script src="server-client.js?v=20260724-github-v01321"></script>
-  <script src="admin.js?v=20260724-github-v01321"></script>
+  <script src="runtime-settings.js?v=20260724-github-v01321-loginfix1"></script>
+  <script src="server-client.js?v=20260724-github-v01321-loginfix1"></script>
+  <script src="admin.js?v=20260724-github-v01321-loginfix1"></script>
 </body>
 </html>

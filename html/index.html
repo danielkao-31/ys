@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="icon" type="image/png" href="../UI/app-icon.png">
   <link rel="apple-touch-icon" href="../UI/app-icon.png">
-  <link rel="manifest" href="manifest.webmanifest?v=20260724-github-v01321">
+  <link rel="manifest" href="manifest.webmanifest?v=20260724-github-v01321-loginfix1">
 <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,7 +13,7 @@
   <meta name="application-name" content="高雄青職｜活力同行">
   <meta name="theme-color" content="#8fd3ff">
   <title>高雄青職｜活力同行</title>
-  <link rel="stylesheet" href="style.css?v=20260724-github-v01321">
+  <link rel="stylesheet" href="style.css?v=20260724-github-v01321-loginfix1">
 </head>
 <body>
   <div class="app-shell">
@@ -31,15 +31,31 @@
         <section class="auth-card">
           <h2>登入旅程</h2>
 
-          <form id="loginForm" class="form-stack">
+          <form id="loginForm" class="form-stack" autocomplete="off">
             <label class="field-label">
               登入帳號
-              <input id="loginName" type="text" autocomplete="username" placeholder="請輸入登入帳號">
+              <input
+                id="loginName"
+                name="login-account-input"
+                type="text"
+                autocomplete="off"
+                autocapitalize="none"
+                spellcheck="false"
+                readonly
+                placeholder="請輸入登入帳號"
+              >
             </label>
 
             <label class="field-label">
               登入密碼
-              <input id="loginPassword" type="password" autocomplete="current-password" placeholder="請輸入登入密碼">
+              <input
+                id="loginPassword"
+                name="login-password-input"
+                type="password"
+                autocomplete="new-password"
+                readonly
+                placeholder="請輸入登入密碼"
+              >
             </label>
 
             <button class="primary-btn" type="submit">進入旅程</button>
@@ -983,8 +999,8 @@
     </div>
   </div>
 
-  <script src="runtime-settings.js?v=20260724-github-v01321"></script>
-  <script src="server-client.js?v=20260724-github-v01321"></script>
-  <script src="script.js?v=20260724-github-v01321"></script>
+  <script src="runtime-settings.js?v=20260724-github-v01321-loginfix1"></script>
+  <script src="server-client.js?v=20260724-github-v01321-loginfix1"></script>
+  <script src="script.js?v=20260724-github-v01321-loginfix1"></script>
 </body>
 </html>
