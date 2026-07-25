@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'yct_current_player';
   const MESSAGE_SUPPRESSION_RETRY_KEY = 'yct_message_suppression_retry';
   const ASSET_BASE_URL = 'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const ASSET_VERSION = '20260723-v01313';
+  const ASSET_VERSION = '20260725-v01322-stable-fix3';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -15,20 +15,9 @@ const STORAGE_KEY = 'yct_current_player';
     );
   const IMAGE_ASSETS = (() => {
     const assets = {
-      appBgMobile: ASSET_BASE_URL + '/UI/app-bg-cute-v4.png',
-      appBgDesktop: ASSET_BASE_URL + '/UI/app-bg-cute-v4.png',
-      heroMobile: ASSET_BASE_URL + '/UI/hero-journey-cute-v4.png',
-      heroDesktop: ASSET_BASE_URL + '/UI/hero-journey-cute-v4.png',
-      journeyMobile: ASSET_BASE_URL + '/UI/journey-map-cute-v4.png',
-      journeyDesktop: ASSET_BASE_URL + '/UI/journey-map-cute-v4.png',
-      gameCamp: ASSET_BASE_URL + '/UI/board-panel-cute-v4.png',
-      gamePanel: ASSET_BASE_URL + '/UI/quest-panel-cute-v4.png',
-      iconPrayerLink: ASSET_BASE_URL + '/UI/icon-prayer-link.png',
-      iconGrowth: ASSET_BASE_URL + '/UI/icon-growth.png',
       systemAnnouncement: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_07.png',
       specialTaskInProgress: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_01.png',
-      specialTaskCompleted: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_03.png',
-      fallbackChest: IMAGE_FALLBACK_DATA_URL
+      specialTaskCompleted: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_03.png'
     };
 
     for (let i = 1; i <= 8; i += 1) {
@@ -112,9 +101,17 @@ const STORAGE_KEY = 'yct_current_player';
     groupInfo: 3 * 60 * 1000
   };
   const HOME_SYNC_POLL_MS = 60 * 1000;
+  const HOME_SYNC_COOLDOWN_MS = 15 * 1000;
   const SERVER_READ_CALL_TIMEOUT_MS = 60 * 1000;
+  const SERVER_AUTH_SLOW_WARNING_MS = 45 * 1000;
+  const SERVER_AUTH_CALL_TIMEOUT_MS = 2 * 60 * 1000;
+  const SERVER_AUTH_COMBINED_APIS = new Set([
+    'loginPlayerWithDashboard',
+    'registerPlayerWithDashboard'
+  ]);
   const SERVER_MUTATION_APIS = new Set([
-    'loginPlayer', 'registerPlayer', 'logoutPlayer', 'updatePlayerAvatar', 'markPlayerMessageRead',
+    'loginPlayer', 'loginPlayerWithDashboard', 'registerPlayer', 'registerPlayerWithDashboard',
+    'logoutPlayer', 'updatePlayerAvatar', 'markPlayerMessageRead',
     'suppressPlayerMessageToday', 'updateMyAccount', 'updateMyPassword',
     'createVitalGroup', 'joinVitalGroupByInviteCode', 'switchPrimaryVitalGroup',
     'leaveVitalGroup', 'createGroupPost', 'updateGroupPost', 'deleteGroupPost',
@@ -329,6 +326,7 @@ const STORAGE_KEY = 'yct_current_player';
     businessDate: '',
     homeSyncToken: '',
     homeSyncCheckInFlight: false,
+    lastHomeSyncCheckAt: 0,
     crossDayRefreshTimer: null,
     homeSyncTimer: null
   };
@@ -342,11 +340,9 @@ const STORAGE_KEY = 'yct_current_player';
   function initApp() {
     initializeLoginFieldProtection_();
     applySavedTheme();
-    preloadCriticalBackgrounds_();
     bindEvents();
-    initRegisterAvatar();
-    hydrateExistingImages_();
     initializeAppLifecycleRefresh_();
+
     restoreSession();
   }
 
@@ -473,16 +469,24 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function checkHomeSyncState_() {
+    const homeView = document.getElementById('homeView');
+    const now = Date.now();
+
     if (
       state.homeSyncCheckInFlight ||
       !state.sessionToken ||
       !state.currentPlayer ||
       !state.currentPlayer.playerId ||
-      document.visibilityState === 'hidden'
+      document.visibilityState === 'hidden' ||
+      !homeView ||
+      homeView.classList.contains('hidden') ||
+      now - Number(state.lastHomeSyncCheckAt || 0) <
+        HOME_SYNC_COOLDOWN_MS
     ) {
       return;
     }
 
+    state.lastHomeSyncCheckAt = now;
     state.homeSyncCheckInFlight = true;
 
     callServer('getHomeSyncState')
@@ -576,37 +580,13 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
 
-  function preloadCriticalBackgrounds_() {
-    const root = document.documentElement;
-    const backgroundAssets = [
-      ['--asset-bg-mobile', 'appBgMobile'],
-      ['--asset-bg-desktop', 'appBgDesktop'],
-      ['--asset-hero-mobile', 'heroMobile'],
-      ['--asset-hero-desktop', 'heroDesktop'],
-      ['--asset-journey-mobile', 'journeyMobile'],
-      ['--asset-journey-desktop', 'journeyDesktop'],
-      ['--asset-game-camp', 'gameCamp'],
-      ['--asset-game-panel', 'gamePanel'],
-      ['--asset-chest-hero', 'chest01Close']
-    ];
 
-    backgroundAssets.forEach(([cssVar, key]) => {
-      loadManagedImage_(key, IMAGE_ASSETS[key])
-        .then((url) => {
-          root.style.setProperty(cssVar, 'url("' + url + '")');
-        })
-        .catch(() => {
-          if (key.indexOf('chest') === 0) {
-            root.style.setProperty(cssVar, 'url("' + IMAGE_FALLBACK_DATA_URL + '")');
-          }
-        });
-    });
-  }
 
-  function hydrateExistingImages_(root) {
+  function hydrateExistingImages_(root, selector) {
     const scope = root || document;
+    const imageSelector = selector || 'img[src], img[data-managed-url]';
 
-    Array.from(scope.querySelectorAll('img[src], img[data-managed-url]')).forEach((img) => {
+    Array.from(scope.querySelectorAll(imageSelector)).forEach((img) => {
       const managedUrl = img.dataset.managedUrl || '';
       const url = managedUrl || img.getAttribute('src') || '';
 
@@ -1044,9 +1024,16 @@ const STORAGE_KEY = 'yct_current_player';
     loadInitialAppData_()
       .then((res) => {
         if (!isSuccess(res) || !res.data || !res.data.player) {
-          clearCurrentSession();
-          showAuth();
-          setLoading(false);
+          if (isSessionErrorResponse(res)) {
+            setLoading(false);
+            return;
+          }
+
+          // 網路、GAS 暫時忙碌或 Dashboard 區塊失敗時保留現有
+          // Session，只讓使用者重試首頁資料，不把有效登入狀態清除。
+          showInitialLoadError_(
+            getResponseError(res, '首頁資料讀取失敗')
+          );
           return;
         }
 
@@ -1055,7 +1042,6 @@ const STORAGE_KEY = 'yct_current_player';
         enterHomeWithDashboard_(data);
       })
       .catch((error) => {
-        clearCurrentSession();
         showInitialLoadError_(getErrorMessage(error));
       });
   }
@@ -1065,28 +1051,40 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function enterHomeWithDashboard_(data) {
-    data = data || {};
+    const dashboardData = Object.assign({}, data || {});
 
-    state.currentPlayer = data.player;
-    state.currentCycleId = data.cycleId ||
-      (data.cycle && data.cycle.cycleId) ||
+    // 合併登入／註冊 API 會額外回傳 Session。Session 只保留在
+    // state 與既有 localStorage 登入資料，不寫入 Dashboard 快取。
+    delete dashboardData.sessionToken;
+    delete dashboardData.authenticated;
+    delete dashboardData.message;
+
+    state.currentPlayer = dashboardData.player;
+    state.currentCycleId = dashboardData.cycleId ||
+      (dashboardData.cycle && dashboardData.cycle.cycleId) ||
       '';
     persistCurrentPlayer();
 
-    state.homeSyncToken = String(data.syncToken || '').trim();
+    state.homeSyncToken = String(dashboardData.syncToken || '').trim();
     state.businessDate = String(
-      data.businessDate || getTaipeiBusinessDate_()
+      dashboardData.businessDate || getTaipeiBusinessDate_()
     ).trim();
 
-    if (data.taskConfig) {
-      applyTaskConfiguration_(data.taskConfig);
+    if (dashboardData.taskConfig) {
+      applyTaskConfiguration_(dashboardData.taskConfig);
     }
 
-    setCache_('dashboard', data);
+    setCache_('dashboard', dashboardData);
     showView('home', {
       skipDataLoad: true
     });
-    renderDashboardData_(data);
+    // 首頁登入時只初始化固定 data-managed-url 圖示，避免掃描玩家頭像
+    // 等動態 img[src]，造成前一位使用者圖片晚到後覆蓋新資料。
+    hydrateExistingImages_(
+      document.getElementById('homeView'),
+      'img[data-managed-url]'
+    );
+    renderDashboardData_(dashboardData);
     setLoading(false);
     window.setTimeout(retryPendingMessageCenterSuppression_, 0);
   }
@@ -1236,6 +1234,131 @@ const STORAGE_KEY = 'yct_current_player';
     state.pendingConfirm = null;
   }
 
+  function persistAuthenticatedSession_(data) {
+    data = data || {};
+
+    const sessionToken = String(data.sessionToken || '').trim();
+    const player = data.player || null;
+
+    if (!sessionToken || !player || !player.playerId) {
+      return false;
+    }
+
+    state.sessionToken = sessionToken;
+    state.sessionInvalidated = false;
+    state.currentPlayer = player;
+    persistCurrentPlayer();
+    return true;
+  }
+
+  function startAuthenticationRequest_(action, apiName, args) {
+    callServer(apiName, ...(args || []))
+      .then((res) => {
+        applyAuthenticationResponse_(action, res);
+      })
+      .catch((error) => {
+        setLoading(false);
+
+        if (action === 'register') {
+          if (error && error.code === 'AUTH_RESPONSE_TIMEOUT') {
+            const payload = args && args[0] ? args[0] : {};
+            closeModal('registerModal');
+            showAuth();
+            $('#loginName').value = String(payload.loginName || '').trim();
+            $('#loginPassword').value = '';
+            showAuthMessage(
+              '註冊結果無法確認：' + getErrorMessage(error) +
+              '。請先使用剛才的帳號與密碼登入；若仍無法登入，再重新註冊。'
+            );
+            return;
+          }
+
+          setResultMessage(
+            '#registerMessage',
+            getErrorMessage(error)
+          );
+          return;
+        }
+
+        showAuthMessage(
+          '登入連線失敗：' + getErrorMessage(error) +
+          '。請確認網路後重新登入。'
+        );
+      });
+  }
+
+  function applyAuthenticationResponse_(action, res) {
+    const isRegister = action === 'register';
+
+    if (!isSuccess(res)) {
+      if (
+        res &&
+        res.code === 'DASHBOARD_LOAD_FAILED' &&
+        res.data &&
+        res.data.authenticated &&
+        persistAuthenticatedSession_(res.data)
+      ) {
+        if (isRegister) {
+          closeModal('registerModal');
+        } else {
+          $('#loginPassword').value = '';
+        }
+
+        showInitialLoadError_(
+          getResponseError(
+            res,
+            isRegister
+              ? '帳號已建立，但首頁資料讀取失敗'
+              : '登入成功，但首頁資料讀取失敗'
+          )
+        );
+        return false;
+      }
+
+      setLoading(false);
+
+      if (isRegister) {
+        setResultMessage(
+          '#registerMessage',
+          getResponseError(res, '註冊失敗')
+        );
+      } else {
+        showAuthMessage(getResponseError(res, '登入失敗'));
+      }
+
+      return false;
+    }
+
+    if (!persistAuthenticatedSession_(res.data)) {
+      clearCurrentSession();
+      showAuth();
+      setLoading(false);
+      showAuthMessage(
+        (isRegister ? '註冊' : '登入') +
+        '成功，但登入憑證不完整'
+      );
+      return false;
+    }
+
+    if (isRegister) {
+      closeModal('registerModal');
+    } else {
+      $('#loginPassword').value = '';
+    }
+
+    enterHomeWithDashboard_(res.data);
+
+    if (state.currentPlayer && state.currentPlayer.passwordMustChange) {
+      openAccountSettingsModal();
+      setResultMessage(
+        '#accountSettingsMessage',
+        '此帳號目前使用臨時密碼，請先修改登入密碼後再繼續操作。'
+      );
+    }
+
+    return true;
+  }
+
   function handleLogin(event) {
     event.preventDefault();
 
@@ -1249,56 +1372,14 @@ const STORAGE_KEY = 'yct_current_player';
 
     setLoading(true, '正在載入旅程…');
 
-    callServer('loginPlayer', playerName, passwordCode)
-      .then((res) => {
-        if (!isSuccess(res)) {
-          setLoading(false);
-          showAuthMessage(getResponseError(res, '登入失敗'));
-          return null;
-        }
-
-        state.sessionToken = String(res.data.sessionToken || '').trim();
-        state.sessionInvalidated = false;
-        state.currentPlayer = res.data.player;
-        persistCurrentPlayer();
-
-        $('#loginPassword').value = '';
-        return loadInitialAppData_();
-      })
-      .then((dashboardRes) => {
-        if (!dashboardRes) {
-          return;
-        }
-
-        if (!isSuccess(dashboardRes) || !dashboardRes.data || !dashboardRes.data.player) {
-          clearCurrentSession();
-          showAuth();
-          showAuthMessage(getResponseError(dashboardRes, '首頁資料讀取失敗'));
-          setLoading(false);
-          return;
-        }
-
-        enterHomeWithDashboard_(dashboardRes.data);
-
-        if (state.currentPlayer && state.currentPlayer.passwordMustChange) {
-          openAccountSettingsModal();
-          setResultMessage(
-            '#accountSettingsMessage',
-            '此帳號目前使用臨時密碼，請先修改登入密碼後再繼續操作。'
-          );
-        }
-      })
-      .catch((error) => {
-        showAuth();
-        showAuthMessage(getErrorMessage(error));
-        setLoading(false);
-      });
+    startAuthenticationRequest_(
+      'login',
+      'loginPlayerWithDashboard',
+      [playerName, passwordCode]
+    );
   }
 
-  function initRegisterAvatar() {
-    state.registerAvatar = buildRandomAvatar('male');
-    renderRegisterAvatar();
-  }
+
 
   function openRegisterModal() {
     $('#registerName').value = '';
@@ -1554,55 +1635,11 @@ const STORAGE_KEY = 'yct_current_player';
 
     setLoading(true, '正在載入旅程…');
 
-    callServer('registerPlayer', payload)
-      .then((res) => {
-        if (!isSuccess(res)) {
-          setLoading(false);
-          setResultMessage(
-            '#registerMessage',
-            getResponseError(res, '註冊失敗')
-          );
-          return;
-        }
-
-        state.sessionToken = String(res.data.sessionToken || '').trim();
-        state.sessionInvalidated = false;
-        state.currentPlayer = res.data.player;
-        persistCurrentPlayer();
-
-        closeModal('registerModal');
-        return loadInitialAppData_();
-      })
-      .then((dashboardRes) => {
-        if (!dashboardRes) {
-          return;
-        }
-
-        if (!isSuccess(dashboardRes) || !dashboardRes.data || !dashboardRes.data.player) {
-          clearCurrentSession();
-          showAuth();
-          setResultMessage(
-            '#authMessage',
-            getResponseError(dashboardRes, '首頁資料讀取失敗')
-          );
-          setLoading(false);
-          return;
-        }
-
-        enterHomeWithDashboard_(dashboardRes.data);
-
-        if (state.currentPlayer && state.currentPlayer.passwordMustChange) {
-          openAccountSettingsModal();
-          setResultMessage(
-            '#accountSettingsMessage',
-            '此帳號目前使用臨時密碼，請先修改登入密碼後再繼續操作。'
-          );
-        }
-      })
-      .catch((error) => {
-        setResultMessage('#registerMessage', getErrorMessage(error));
-        setLoading(false);
-      });
+    startAuthenticationRequest_(
+      'register',
+      'registerPlayerWithDashboard',
+      [payload]
+    );
   }
 
   function createEmptyMessageCenterState_() {
@@ -5857,6 +5894,8 @@ function clearPrayerAutoScroll(selector) {
     state.sessionToken = '';
     state.sessionInvalidated = false;
     state.currentCycleId = '';
+    state.homeSyncCheckInFlight = false;
+    state.lastHomeSyncCheckAt = 0;
     state.dailyRecord = null;
     state.weeklyTaskRecord = null;
     state.groupJourney = null;
@@ -6205,18 +6244,73 @@ function clearPrayerAutoScroll(selector) {
   function callServer(functionName, ...args) {
     const finalArgs = prepareServerCallArgs(functionName, args);
     const isMutation = SERVER_MUTATION_APIS.has(functionName);
+    const isCombinedAuthMutation = SERVER_AUTH_COMBINED_APIS.has(functionName);
+    const now = () => (
+      window.performance && typeof window.performance.now === 'function'
+        ? window.performance.now()
+        : Date.now()
+    );
+    const requestStartedAt = now();
+    let performanceLogged = false;
+
+    const logPerformance = (success, error, code) => {
+      if (performanceLogged) {
+        return;
+      }
+
+      performanceLogged = true;
+      const details = {
+        apiName: functionName,
+        elapsedMs: Math.max(0, Math.round(now() - requestStartedAt)),
+        success: !!success
+      };
+
+      if (!success) {
+        details.code = String(code || '');
+        details.error = String(error || '系統錯誤');
+        console.error('[API]', details);
+        return;
+      }
+
+      console.info('[API]', details);
+    };
 
     return new Promise((resolve, reject) => {
       let settled = false;
-      // GAS Web App 請求無法取消已開始的後端執行。讀取逾時可以安全重試；
-      // 寫入則等待正式 callback，避免畫面先宣告失敗後又重複送出。
-      const timeoutId = isMutation ? 0 : window.setTimeout(() => {
+      // GAS Web App 請求無法取消已開始的後端執行。一般寫入型 API
+      // 仍等待正式 callback；登入／註冊使用單一、有限的等待上限。
+      // 逾時後不重送、不查快取、不輪詢，改由使用者以帳密直接登入確認。
+      const timeoutMs = isCombinedAuthMutation
+        ? SERVER_AUTH_CALL_TIMEOUT_MS
+        : (isMutation ? 0 : SERVER_READ_CALL_TIMEOUT_MS);
+      const slowWarningId = isCombinedAuthMutation
+        ? window.setTimeout(() => {
+          if (settled) return;
+          const loadingText = $('#loadingText');
+          if (loadingText) {
+            loadingText.textContent = functionName === 'registerPlayerWithDashboard'
+              ? '註冊仍在處理，請勿重複送出或關閉頁面…'
+              : '登入仍在處理，請勿重複送出或關閉頁面…';
+          }
+        }, SERVER_AUTH_SLOW_WARNING_MS)
+        : 0;
+      const timeoutId = timeoutMs > 0 ? window.setTimeout(() => {
         if (settled) return;
         settled = true;
-        reject(new Error('伺服器回應逾時，請確認網路後再試一次'));
-      }, SERVER_READ_CALL_TIMEOUT_MS);
+        const error = new Error(
+          isCombinedAuthMutation
+            ? '伺服器處理時間過長，結果無法確認'
+            : '伺服器回應逾時，請確認網路後再試一次'
+        );
+        error.code = isCombinedAuthMutation
+          ? 'AUTH_RESPONSE_TIMEOUT'
+          : 'CLIENT_TIMEOUT';
+        logPerformance(false, error.message, error.code);
+        reject(error);
+      }, timeoutMs) : 0;
 
-      const clearCallTimeout = () => {
+      const clearCallTimers = () => {
+        if (slowWarningId) window.clearTimeout(slowWarningId);
         if (timeoutId) window.clearTimeout(timeoutId);
       };
 
@@ -6226,12 +6320,17 @@ function clearPrayerAutoScroll(selector) {
         }
 
         settled = true;
-        clearCallTimeout();
+        clearCallTimers();
 
         if (isSessionErrorResponse(res)) {
           handleSessionExpired();
         }
 
+        logPerformance(
+          isSuccess(res),
+          res && res.error,
+          res && res.code
+        );
         resolve(res);
       };
 
@@ -6241,7 +6340,12 @@ function clearPrayerAutoScroll(selector) {
         }
 
         settled = true;
-        clearCallTimeout();
+        clearCallTimers();
+        logPerformance(
+          false,
+          error && error.message ? error.message : String(error || ''),
+          'NETWORK_ERROR'
+        );
         reject(error);
       };
 
