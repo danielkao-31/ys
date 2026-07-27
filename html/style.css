@@ -244,6 +244,24 @@ body .hidden{
     line-height:1.32;
 }
 
+.session-choice-row{
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.45;
+  cursor:pointer;
+}
+
+.session-choice-row input{
+  width:18px;
+  height:18px;
+  margin:1px 0 0;
+  flex:0 0 auto;
+  accent-color:var(--brand);
+}
+
 input{
   font:inherit;
   width:100%;
@@ -2925,57 +2943,17 @@ body[data-theme="night"] .auth-hero{
     text-overflow:ellipsis;
 }
 
-#meetingView .meeting-hero{
-  position:relative;
-    min-height:104px;
-    padding:17px;
-    overflow:hidden;
-    background:radial-gradient(circle at 86% 24%,rgba(146,211,205,.28) 0 34px,transparent 35px),
-        linear-gradient(180deg,#fffdf8,#f1dcc9);
-}
 
-#dailyView .daily-main-card{
-  position:relative;
-    min-height:104px;
-    padding:17px;
-    overflow:hidden;
-    background:radial-gradient(circle at 86% 24%,rgba(146,211,205,.28) 0 34px,transparent 35px),
-        linear-gradient(180deg,#fffdf8,#f1dcc9);
-}
 
-#meetingView .meeting-hero:after{
-  content:"";
-    position:absolute;
-    right:-22px;
-    bottom:-34px;
-    width:110px;
-    height:88px;
-    border-radius:50%;
-    background:rgba(255,255,255,.38);
-}
 
-#dailyView .daily-main-card:after{
-  content:"";
-    position:absolute;
-    right:-22px;
-    bottom:-34px;
-    width:110px;
-    height:88px;
-    border-radius:50%;
-    background:rgba(255,255,255,.38);
-}
 
-#meetingView .meeting-hero strong{
-  color:#283743;
-    font-size:38px;
-    line-height:1;
-}
 
-#dailyView .daily-main-card strong{
-  color:#283743;
-    font-size:38px;
-    line-height:1;
-}
+
+
+
+
+
+
 
 #myView .my-profile-card{
   min-height:122px;
@@ -3113,15 +3091,15 @@ body[data-theme="night"] .auth-hero{
     --shadow-soft:0 7px 18px rgba(44,56,60,.09);
     --radius:22px;
     --radius-small:15px;
-    --asset-bg-mobile:url("https://raw.githubusercontent.com/danielkao-31/ys/main/UI/app-bg-cute-v4.png");
-    --asset-bg-desktop:url("https://raw.githubusercontent.com/danielkao-31/ys/main/UI/app-bg-cute-v4.png");
-    --asset-hero-mobile:url("https://raw.githubusercontent.com/danielkao-31/ys/main/UI/hero-journey-cute-v4.png");
-    --asset-hero-desktop:url("https://raw.githubusercontent.com/danielkao-31/ys/main/UI/hero-journey-cute-v4.png");
-    --asset-journey-mobile:url("https://raw.githubusercontent.com/danielkao-31/ys/main/UI/journey-map-cute-v4.png");
-    --asset-journey-desktop:url("https://raw.githubusercontent.com/danielkao-31/ys/main/UI/journey-map-cute-v4.png");
-    --asset-game-camp:url("https://raw.githubusercontent.com/danielkao-31/ys/main/UI/board-panel-cute-v4.png");
-    --asset-game-panel:url("https://raw.githubusercontent.com/danielkao-31/ys/main/UI/quest-panel-cute-v4.png");
-    --asset-chest-hero:url("https://raw.githubusercontent.com/danielkao-31/ys/main/Chest_Assets/Chest_01.png");
+    --asset-bg-mobile:url("../UI/app-bg-cute-v4.png");
+    --asset-bg-desktop:url("../UI/app-bg-cute-v4.png");
+    --asset-hero-mobile:url("../UI/hero-journey-cute-v4.png");
+    --asset-hero-desktop:url("../UI/hero-journey-cute-v4.png");
+    --asset-journey-mobile:url("../UI/journey-map-cute-v4.png");
+    --asset-journey-desktop:url("../UI/journey-map-cute-v4.png");
+    --asset-game-camp:url("../UI/board-panel-cute-v4.png");
+    --asset-game-panel:url("../UI/quest-panel-cute-v4.png");
+    --asset-chest-hero:url("../Chest_Assets/Chest_01.png");
     --cute-ink:#6b514d;
     --cute-line:#a8877b;
     --cute-panel:#fff9ef;
@@ -3889,37 +3867,19 @@ body{
     padding-bottom:calc(76px + env(safe-area-inset-bottom));
 }
 
-#homeView .home-section:has(#homePrayerCarousel){
-  margin-bottom:0;
-    padding:14px 12px 13px;
-}
 
-#homeView .home-section:has(#homePrayerCarousel) .section-heading{
-  margin:0 3px 10px;
-    align-items:center;
-}
 
-#homeView .home-section:has(#homePrayerCarousel) .section-heading h2{
-  line-height:1.05;
-}
 
-#homeView #homePrayerCarousel.is-empty{
-  padding-bottom:0;
-}
 
-#homeView #homePrayerCarousel.is-single{
-  max-height:74px;
-}
 
-#homeView #homePrayerCarousel.is-many{
-  max-height:204px;
-    overflow:hidden;
-}
 
-#homeView #homePrayerCarousel .empty-card{
-  min-height:44px;
-    padding:11px 12px;
-}
+
+
+
+
+
+
+
 
 #prayerView .prayer-inline-line{
   gap:8px;
@@ -3958,10 +3918,7 @@ body{
   grid-area:title;
 }
 
-#homeView #homePrayerCarousel .prayer-inline-line .info-chip{
-  font-size:12px;
-  display:none;
-}
+
 
 #prayerView .prayer-inline-line .info-chip{
   display:none;
@@ -4004,114 +3961,134 @@ body{
 }
 
 #homeView .hero-announcements{
+  max-width:none;
   position:absolute;
-    left:14px;
-    right:12px;
-    bottom:20px;
-    z-index:5;
-    display:grid;
-    grid-template-columns:auto minmax(0,1fr);
-    align-items:center;
-    height:34px;
-    padding:0 12px;
-    gap:8px;
-    overflow:hidden;
-    border:3px solid rgba(255,248,237,.92);
-    border-radius:999px;
-    background:linear-gradient(180deg,rgba(255,253,248,.88),rgba(255,227,198,.82));
-    box-shadow:0 4px 0 rgba(172,124,96,.72),0 2px 0 #fff inset;
+  left:14px;
+  right:auto;
+  bottom:16px;
+  z-index:30;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:center;
+  gap:8px;
+  width:calc(100% - 28px);
+  height:42px;
+  min-height:42px;
+  padding:0 12px;
+  overflow:hidden;
+  border:3px solid rgba(255,248,237,.92);
+  border-radius:999px;
+  background:linear-gradient(180deg,rgba(255,253,248,.92),rgba(255,227,198,.88));
+  box-shadow:0 4px 0 rgba(172,124,96,.72),0 2px 0 #fff inset;
 }
 
 #homeView .hero-announcement-label{
   display:flex;
-    align-items:center;
-    justify-content:center;
-    height:100%;
-    margin:0;
-    padding:0;
-    color:#8f4e58;
-    font-style:normal;
-    font-size:13px;
-    font-weight:950;
-    line-height:1;
-    white-space:nowrap;
+  align-items:center;
+  justify-content:center;
+  height:34px;
+  margin:0;
+  padding:0;
+  color:#8f4e58;
+  font-style:normal;
+  font-size:15px;
+  font-weight:950;
+  line-height:1;
+  white-space:nowrap;
 }
 
 #homeView .hero-announcement-window{
+  max-width:none;
+  position:relative;
+  display:block;
   min-width:0;
-    height:100%;
-    overflow:hidden;
-    display:flex;
-    align-items:center;
+  width:100%;
+  height:34px;
+  min-height:34px;
+  overflow:hidden;
 }
 
 #homeView .hero-announcement-track{
+  display:block;
   width:100%;
-    transition:transform .34s ease;
-    will-change:transform;
+  min-width:0;
+  transition:transform .34s ease;
+  will-change:transform;
 }
 
 #homeView .hero-announcement-item{
   display:grid;
-    grid-template-columns:auto minmax(0,1fr);
-    align-items:center;
-    height:34px;
-    padding:0;
-    gap:6px;
-    color:#5a4046;
-    font-size:13px;
-    line-height:1;
-    white-space:nowrap;
+  grid-template-columns:max-content minmax(0,1fr);
+  align-items:center;
+  column-gap:7px;
+  width:100%;
+  height:34px;
+  min-height:34px;
+  margin:0;
+  padding:0;
+  color:#5a4046;
+  font-size:14px;
+  line-height:1;
+  white-space:nowrap;
 }
 
 .group-post-manage-row strong{
   display:block;
-    min-width:0;
-    overflow:hidden;
-    text-overflow:ellipsis;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
   color:#4d3b46;
-    font-size:15px;
-    line-height:1.25;
+  font-size:15px;
+  line-height:1.25;
 }
 
 .group-post-manage-row small{
   display:block;
-    min-width:0;
-    overflow:hidden;
-    text-overflow:ellipsis;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
   margin-top:3px;
-    color:#806a68;
-    font-size:12px;
+  color:#806a68;
+  font-size:12px;
 }
 
 #homeView .hero-announcement-item strong{
   display:flex;
-    align-items:center;
-    height:34px;
-    line-height:1;
-  max-width:64px;
-    color:#a5575c;
-    font-weight:950;
-    overflow:hidden;
-    text-overflow:ellipsis;
+  align-items:center;
+  min-width:0;
+  width:auto;
+  max-width:78px;
+  height:34px;
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  color:#a5575c;
+  font-weight:950;
+  line-height:1;
+  white-space:nowrap;
+  text-overflow:ellipsis;
 }
 
 #homeView .hero-announcement-item span{
   display:flex;
-    align-items:center;
-    height:34px;
-    line-height:1;
+  align-items:center;
   min-width:0;
-    max-width:none;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    font-weight:850;
+  max-width:none;
+  height:34px;
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  color:#5a4046;
+  font-weight:850;
+  line-height:1;
+  white-space:nowrap;
+  text-overflow:ellipsis;
 }
 
 #homeView .hero-announcements.is-empty .hero-announcement-item{
   grid-template-columns:1fr;
-    text-align:left;
-    color:#806a68;
+  color:#806a68;
+  text-align:left;
 }
 
 #homeView .group-social-section{
@@ -4475,6 +4452,29 @@ body{
   margin-top:12px;
     display:grid;
     gap:12px;
+}
+
+
+.login-persistence-option {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 44px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.login-persistence-option input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
+.login-device-note {
+  margin: -0.35rem 0 0;
+  color: var(--muted-text);
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 .primary-btn{
@@ -4850,45 +4850,13 @@ body{
     box-shadow:0 4px 0 #c9a47c;
 }
 
-#homeView #homePrayerCarousel{
-  min-height:0;
-    padding:0 1px 5px;
-    display:grid;
-    gap:8px;
-    max-height:184px;
-    overflow:hidden;
-}
 
-#homeView #homePrayerCarousel .prayer-carousel-card{
-  border-width:3px;
-    border-radius:15px;
-    box-sizing:border-box;
-    height:56px;
-    min-height:56px;
-    padding:8px 10px;
-}
 
-#homeView #homePrayerCarousel .prayer-inline-line{
-  gap:7px;
-  display:grid;
-    grid-template-columns:minmax(44px,62px) 38px minmax(0,1fr) auto;
-    grid-template-rows:1fr;
-    grid-template-areas:"owner date title action";
-    align-items:center;
-    column-gap:8px;
-    row-gap:0;
-    width:100%;
-}
 
-#homeView #homePrayerCarousel .prayer-inline-line .prayer-owner{
-  grid-area:owner;
-    min-width:0;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-    font-size:14px;
-    font-weight:900;
-}
+
+
+
+
 
 .game-prayer-row .prayer-owner{
   grid-area:owner;
@@ -4900,17 +4868,7 @@ body{
     font-weight:900;
 }
 
-#homeView #homePrayerCarousel .prayer-inline-line .prayer-date{
-  grid-area:date;
-    min-width:0;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-    color:#94605f;
-    font-size:12px;
-    font-weight:900;
-    text-align:center;
-}
+
 
 .game-prayer-row .prayer-date{
   grid-area:date;
@@ -4924,16 +4882,7 @@ body{
     text-align:center;
 }
 
-#homeView #homePrayerCarousel .prayer-inline-line strong{
-  grid-area:title;
-    min-width:0;
-    overflow:hidden;
-    text-overflow:ellipsis;
-    white-space:nowrap;
-    margin:0;
-    font-size:18px;
-    line-height:1.1;
-}
+
 
 .game-prayer-row h3{
   grid-area:title;
@@ -4946,17 +4895,7 @@ body{
     line-height:1.1;
 }
 
-#homeView #homePrayerCarousel .prayer-inline-line span:last-child{
-  grid-area:action;
-    justify-self:end;
-    align-self:center;
-    min-width:52px;
-    min-height:34px;
-    padding:6px 10px;
-    font-size:14px;
-    line-height:1;
-    text-align:center;
-}
+
 
 .game-prayer-row button{
   background:linear-gradient(180deg,#6ed58c,#3ba866);
@@ -5683,116 +5622,6 @@ body{
   transform:translateY(2px);
     box-shadow:0 2px 0 #d8799d,
         0 2px 0 rgba(255,255,255,.9) inset;
-}
-
-#homeView .home-hero-card .hero-announcements{
-  max-width:none;
-    position:absolute;
-    left:14px;
-    right:auto;
-    bottom:16px;
-    z-index:30;
-    display:grid;
-    grid-template-columns:auto minmax(0,1fr);
-    align-items:center;
-    gap:8px;
-    width:calc(100% - 28px);
-    height:42px;
-    min-height:42px;
-    padding:0 12px;
-    overflow:hidden;
-    border:3px solid rgba(255,248,237,.92);
-    border-radius:999px;
-    background:linear-gradient(180deg,rgba(255,253,248,.92),rgba(255,227,198,.88));
-    box-shadow:0 4px 0 rgba(172,124,96,.72),
-      0 2px 0 #fff inset;
-}
-
-#homeView .home-hero-card .hero-announcement-label{
-  display:flex;
-    align-items:center;
-    justify-content:center;
-    height:34px;
-    margin:0;
-    padding:0;
-    color:#8f4e58;
-    font-style:normal;
-    font-size:15px;
-    font-weight:950;
-    line-height:1;
-    white-space:nowrap;
-}
-
-#homeView .home-hero-card .hero-announcement-window{
-  max-width:none;
-    position:relative;
-    display:block;
-    min-width:0;
-    width:100%;
-    height:34px;
-    min-height:34px;
-    overflow:hidden;
-}
-
-#homeView .home-hero-card .hero-announcement-track{
-  display:block;
-    width:100%;
-    min-width:0;
-    transition:transform .34s ease;
-    will-change:transform;
-}
-
-#homeView .home-hero-card .hero-announcement-item span{
-  display:flex;
-    align-items:center;
-    min-width:0;
-    height:34px;
-    margin:0;
-    padding:0;
-    line-height:1;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  max-width:none;
-    color:#5a4046;
-    font-weight:850;
-}
-
-#homeView .home-hero-card .hero-announcements.is-empty .hero-announcement-item{
-  grid-template-columns:1fr;
-}
-
-#homeView .home-hero-card .hero-announcement-item{
-  display:grid;
-    align-items:center;
-    width:100%;
-    height:34px;
-    min-height:34px;
-    margin:0;
-    padding:0;
-    color:#5a4046;
-    font-size:14px;
-    line-height:1;
-    white-space:nowrap;
-    grid-template-columns:max-content minmax(0,1fr);
-    column-gap:7px;
-}
-
-#homeView .home-hero-card .hero-announcement-item strong{
-  display:flex;
-    align-items:center;
-    min-width:0;
-    height:34px;
-    margin:0;
-    padding:0;
-    line-height:1;
-    white-space:nowrap;
-    overflow:hidden;
-    text-overflow:ellipsis;
-  color:#a5575c;
-    font-weight:950;
-    max-width:78px;
-    width:auto;
 }
 
 #homeView .home-hero-card .hero-score-grid{

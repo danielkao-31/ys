@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="icon" type="image/png" href="../UI/app-icon.png">
   <link rel="apple-touch-icon" href="../UI/app-icon.png">
-  <link rel="manifest" href="manifest.webmanifest?v=20260725-v01322-stable-fix3">
+  <link rel="manifest" href="manifest.webmanifest?v=20260727-v01321-fix12-rc4">
 <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,7 +13,7 @@
   <meta name="application-name" content="高雄青職｜活力同行">
   <meta name="theme-color" content="#8fd3ff">
   <title>高雄青職｜活力同行</title>
-  <link rel="stylesheet" href="style.css?v=20260725-v01322-stable-fix3">
+  <link rel="stylesheet" href="style.css?v=20260727-v01321-fix12-rc4">
 </head>
 <body>
   <div class="app-shell">
@@ -57,6 +57,12 @@
                 placeholder="請輸入登入密碼"
               >
             </label>
+
+            <label class="login-persistence-option">
+              <input id="keepLoginCheckbox" type="checkbox">
+              <span>保持登入（僅限私人裝置）</span>
+            </label>
+            <p class="login-device-note">共用裝置請勿勾選；未勾選時，關閉此分頁後登入狀態即失效。</p>
 
             <button class="primary-btn" type="submit">進入旅程</button>
           </form>
@@ -321,13 +327,13 @@
 
           <div class="gateway-grid">
             <button id="goPrayerBtn" class="gateway-card prayer-gateway" type="button">
-              <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C/svg%3E" data-managed-url="https://raw.githubusercontent.com/danielkao-31/ys/main/UI/icon-prayer-link.png" data-image-key="iconPrayerLink" alt="">
+              <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C/svg%3E" data-managed-url="../UI/icon-prayer-link.png" data-image-key="iconPrayerLink" alt="">
               <strong>代禱交通</strong>
               <span id="gatewayPrayerText">守望同伴</span>
             </button>
 
             <button id="goMyBtn" class="gateway-card journey-gateway" type="button">
-              <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C/svg%3E" data-managed-url="https://raw.githubusercontent.com/danielkao-31/ys/main/UI/icon-growth.png" data-image-key="iconGrowth" alt="">
+              <img src="data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C/svg%3E" data-managed-url="../UI/icon-growth.png" data-image-key="iconGrowth" alt="">
               <strong>我的足跡</strong>
               <span>貢獻與紀錄</span>
             </button>
@@ -415,7 +421,7 @@
             </button>
 
             <button id="openGroupPostModalBtn" class="my-grid-btn" type="button">
-              <span>活力組<br>公告</span>
+              <span>小組<br>公告</span>
             </button>
 
             <button id="openPracticeHistoryBtn" class="my-grid-btn" type="button">
@@ -474,7 +480,12 @@
 
         <label class="field-label">
           密碼
-          <input id="registerPassword" type="password" autocomplete="new-password" placeholder="請設定 4 至 20 碼登入密碼" required>
+          <input id="registerPassword" type="password" autocomplete="new-password" minlength="8" maxlength="64" placeholder="請設定 8 至 64 碼登入密碼" required>
+        </label>
+
+        <label class="field-label">
+          確認密碼
+          <input id="registerPasswordConfirm" type="password" autocomplete="new-password" minlength="8" maxlength="64" placeholder="請再次輸入登入密碼" required>
         </label>
 
         <label class="field-label">
@@ -530,6 +541,7 @@
         <button class="message-center-tab" data-message-center-tab="REWARD_NOTIFICATION" type="button">任務獎勵</button>
       </div>
 
+      <div id="messageCenterStatusMessage" class="result-box hidden"></div>
       <div id="messageCenterEmpty" class="empty-card hidden">目前沒有訊息</div>
 
       <div id="messageCenterLayout" class="message-center-layout">
@@ -602,7 +614,7 @@
     <div class="modal-card">
       <div class="modal-header">
         <button class="modal-close-btn" data-close-modal="groupPostModal" type="button">‹</button>
-        <h2>組內公告</h2>
+        <h2>小組公告</h2>
         <span></span>
       </div>
 
@@ -616,9 +628,9 @@
       </form>
 
       <section class="management-section">
-        <h4>我的公告</h4>
+        <h4>我的小組公告</h4>
         <div id="myGroupPostList" class="modal-list">
-          <div class="empty-card">尚無自己發布的公告。</div>
+          <div class="empty-card">尚未發布小組公告；每位組員最多 1 則。</div>
         </div>
       </section>
 
@@ -651,7 +663,11 @@
         </label>
         <label class="field-label">
           新登入密碼
-          <input id="newPasswordCode" type="password" autocomplete="new-password">
+          <input id="newPasswordCode" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="8 至 64 碼">
+        </label>
+        <label class="field-label">
+          確認新登入密碼
+          <input id="confirmNewPasswordCode" type="password" minlength="8" maxlength="64" autocomplete="new-password">
         </label>
         <button class="ghost-btn" type="submit">更新登入密碼</button>
       </form>
@@ -717,7 +733,7 @@
 
       <label class="field-label">
         心得或備註（可略過）
-        <textarea id="practiceNote" rows="4" placeholder="可記錄今天的享受或提醒"></textarea>
+        <textarea id="practiceNote" rows="4" maxlength="500" placeholder="可記錄今天的享受或提醒（最多 500 字）"></textarea>
       </label>
 
       <button id="practiceSubmitBtn" class="primary-btn" type="button">確認完成</button>
@@ -742,7 +758,7 @@
 
       <label class="field-label">
         心得或備註（可略過）
-        <textarea id="weeklyTaskNote" rows="4" placeholder="可簡短記錄本週的享受或提醒"></textarea>
+        <textarea id="weeklyTaskNote" rows="4" maxlength="500" placeholder="可簡短記錄本週的享受或提醒（最多 500 字）"></textarea>
       </label>
 
       <button id="weeklyTaskSubmitBtn" class="primary-btn" type="button">確認完成</button>
@@ -999,8 +1015,8 @@
     </div>
   </div>
 
-  <script src="runtime-settings.js?v=20260725-v01322-stable-fix3"></script>
-  <script src="server-client.js?v=20260725-v01322-stable-fix3"></script>
-  <script src="script.js?v=20260725-v01322-stable-fix3"></script>
+  <script src="runtime-settings.js?v=20260727-v01321-fix12-rc4"></script>
+  <script src="server-client.js?v=20260727-v01321-fix12-rc4"></script>
+  <script src="script.js?v=20260727-v01321-fix12-rc4"></script>
 </body>
 </html>

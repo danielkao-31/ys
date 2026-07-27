@@ -1,7 +1,11 @@
 const STORAGE_KEY = 'yct_current_player';
   const MESSAGE_SUPPRESSION_RETRY_KEY = 'yct_message_suppression_retry';
-  const ASSET_BASE_URL = 'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const ASSET_VERSION = '20260725-v01322-stable-fix3';
+  const APP_SYNC_SIGNAL_KEY = 'yct_app_sync_signal';
+  const APP_SYNC_CHANNEL_NAME = 'yct_app_sync_v1';
+  const ASSET_BASE_URL = '..';
+  const REMOTE_AVATAR_BASE_URL =
+    'https://raw.githubusercontent.com/danielkao-31/ys/main';
+  const ASSET_VERSION = '20260727-v01321-fix12-rc4';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -15,17 +19,27 @@ const STORAGE_KEY = 'yct_current_player';
     );
   const IMAGE_ASSETS = (() => {
     const assets = {
+      appBgMobile: ASSET_BASE_URL + '/UI/app-bg-cute-v4.png',
+      appBgDesktop: ASSET_BASE_URL + '/UI/app-bg-cute-v4.png',
+      heroMobile: ASSET_BASE_URL + '/UI/hero-journey-cute-v4.png',
+      heroDesktop: ASSET_BASE_URL + '/UI/hero-journey-cute-v4.png',
+      journeyMobile: ASSET_BASE_URL + '/UI/journey-map-cute-v4.png',
+      journeyDesktop: ASSET_BASE_URL + '/UI/journey-map-cute-v4.png',
+      gameCamp: ASSET_BASE_URL + '/UI/board-panel-cute-v4.png',
+      gamePanel: ASSET_BASE_URL + '/UI/quest-panel-cute-v4.png',
+      iconPrayerLink: ASSET_BASE_URL + '/UI/icon-prayer-link.png',
+      iconGrowth: ASSET_BASE_URL + '/UI/icon-growth.png',
       systemAnnouncement: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_07.png',
       specialTaskInProgress: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_01.png',
-      specialTaskCompleted: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_03.png'
+      specialTaskCompleted: ASSET_BASE_URL + '/Cute_Icons/Cute_Icon_03.png',
+      fallbackChest: IMAGE_FALLBACK_DATA_URL
     };
 
     for (let i = 1; i <= 8; i += 1) {
       const id = String(i).padStart(2, '0');
       const chestUrl = ASSET_BASE_URL + '/Chest_Assets/Chest_' + id + '.png';
 
-      assets['chest' + id + 'Close'] = chestUrl;
-      assets['chest' + id + 'Open'] = chestUrl;
+      assets['chest' + id] = chestUrl;
     }
 
     return assets;
@@ -65,6 +79,7 @@ const STORAGE_KEY = 'yct_current_player';
     'createVitalGroup',
     'joinVitalGroupByInviteCode',
     'switchPrimaryVitalGroup',
+    'transferVitalGroupOwnership',
     'leaveVitalGroup',
     'createGroupPost',
     'updateGroupPost',
@@ -100,21 +115,15 @@ const STORAGE_KEY = 'yct_current_player';
     accountProfile: 3 * 60 * 1000,
     groupInfo: 3 * 60 * 1000
   };
-  const HOME_SYNC_POLL_MS = 60 * 1000;
-  const HOME_SYNC_COOLDOWN_MS = 15 * 1000;
-  const SERVER_READ_CALL_TIMEOUT_MS = 60 * 1000;
-  const SERVER_AUTH_SLOW_WARNING_MS = 45 * 1000;
-  const SERVER_AUTH_CALL_TIMEOUT_MS = 2 * 60 * 1000;
-  const SERVER_AUTH_COMBINED_APIS = new Set([
-    'loginPlayerWithDashboard',
-    'registerPlayerWithDashboard'
-  ]);
+  const HOME_SYNC_POLL_MS = 20 * 1000;
+  const SERVER_READ_CALL_TIMEOUT_MS = 90 * 1000;
+  const CACHE_LOADING_PROMISE_TTL_MS = SERVER_READ_CALL_TIMEOUT_MS + 5 * 1000;
+  const STALE_REQUEST_ERROR_CODE = 'STALE_REQUEST';
   const SERVER_MUTATION_APIS = new Set([
-    'loginPlayer', 'loginPlayerWithDashboard', 'registerPlayer', 'registerPlayerWithDashboard',
-    'logoutPlayer', 'updatePlayerAvatar', 'markPlayerMessageRead',
+    'loginPlayer', 'registerPlayer', 'logoutPlayer', 'updatePlayerAvatar', 'markPlayerMessageRead',
     'suppressPlayerMessageToday', 'updateMyAccount', 'updateMyPassword',
     'createVitalGroup', 'joinVitalGroupByInviteCode', 'switchPrimaryVitalGroup',
-    'leaveVitalGroup', 'createGroupPost', 'updateGroupPost', 'deleteGroupPost',
+    'transferVitalGroupOwnership', 'leaveVitalGroup', 'createGroupPost', 'updateGroupPost', 'deleteGroupPost',
     'submitDailyPractice', 'submitMeetingPractice', 'createPrayerRequest',
     'respondPrayerRequest', 'updatePrayerRequest', 'closePrayerRequest',
     'claimPlayerChestReward', 'advancePlayerCycle'
@@ -275,20 +284,26 @@ const STORAGE_KEY = 'yct_current_player';
     currentPlayer: null,
     sessionToken: '',
     sessionInvalidated: false,
+    sessionGeneration: 0,
     currentCycleId: '',
     cache: {},
+    cacheRequestSequence: 0,
     groups: [],
     dailyRecord: null,
     weeklyTaskRecord: null,
     groupJourney: null,
     homePrayerItems: [],
     homeGroupPosts: [],
+    myGroupPost: null,
     homeGroupMemberCount: 0,
+    homeGroupEnabled: true,
+    homeGroupStatusMessage: '',
     chestSummary: null,
     messageCenter: createEmptyMessageCenterState_(),
     messageCenterFilter: 'ANNOUNCEMENT',
     selectedMessageKey: '',
     messageCenterAutoOpenedKey: '',
+    messageReadInFlight: new Set(),
     pendingMessageCenterSuppressions: new Map(),
     messageCenterSuppressionFlushInFlight: new Set(),
     messageCenterSuppressionRetryAttempts: new Map(),
@@ -326,9 +341,9 @@ const STORAGE_KEY = 'yct_current_player';
     businessDate: '',
     homeSyncToken: '',
     homeSyncCheckInFlight: false,
-    lastHomeSyncCheckAt: 0,
     crossDayRefreshTimer: null,
-    homeSyncTimer: null
+    homeSyncTimer: null,
+    appSyncChannel: null
   };
 
   const $ = (selector) => document.querySelector(selector);
@@ -340,9 +355,11 @@ const STORAGE_KEY = 'yct_current_player';
   function initApp() {
     initializeLoginFieldProtection_();
     applySavedTheme();
+    preloadCriticalBackgrounds_();
     bindEvents();
+    initRegisterAvatar();
+    hydrateExistingImages_();
     initializeAppLifecycleRefresh_();
-
     restoreSession();
   }
 
@@ -469,24 +486,16 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function checkHomeSyncState_() {
-    const homeView = document.getElementById('homeView');
-    const now = Date.now();
-
     if (
       state.homeSyncCheckInFlight ||
       !state.sessionToken ||
       !state.currentPlayer ||
       !state.currentPlayer.playerId ||
-      document.visibilityState === 'hidden' ||
-      !homeView ||
-      homeView.classList.contains('hidden') ||
-      now - Number(state.lastHomeSyncCheckAt || 0) <
-        HOME_SYNC_COOLDOWN_MS
+      document.visibilityState === 'hidden'
     ) {
       return;
     }
 
-    state.lastHomeSyncCheckAt = now;
     state.homeSyncCheckInFlight = true;
 
     callServer('getHomeSyncState')
@@ -502,14 +511,12 @@ const STORAGE_KEY = 'yct_current_player';
 
         if (
           serverBusinessDate &&
-          serverBusinessDate !==
-            String(state.businessDate || '')
+          serverBusinessDate !== String(state.businessDate || '')
         ) {
           state.businessDate = serverBusinessDate;
           state.homeSyncToken = '';
           clearAllAppCache_();
-          refreshDashboard(false);
-          return;
+          return refreshDashboard(false);
         }
 
         const nextToken = String(data.token || '').trim();
@@ -524,24 +531,117 @@ const STORAGE_KEY = 'yct_current_player';
         }
 
         if (nextToken !== state.homeSyncToken) {
-          state.homeSyncToken = nextToken;
           invalidateCache_('dashboard');
           invalidateCaches_([
+            'groupInfo',
+            'groupAnnouncements',
             'journey',
             'groupJourneyList',
             'contribution',
             'growth',
             'chestSummary',
             'chestCollection',
+            'chestSettingsForPlayer',
             'accountProfile'
           ]);
-          refreshDashboard(false);
+          return refreshDashboard(false);
         }
       })
       .catch(() => {})
       .finally(() => {
         state.homeSyncCheckInFlight = false;
       });
+  }
+
+  function getCurrentSessionSyncKey_() {
+    const token = String(state.sessionToken || '').trim();
+    return token
+      ? digestPendingMutationPayload_('session::' + token)
+      : '';
+  }
+
+  function notifyOtherAppInstances_(reason) {
+    const playerId = String(
+      state.currentPlayer && state.currentPlayer.playerId || ''
+    ).trim();
+    const sessionKey = getCurrentSessionSyncKey_();
+
+    if (!playerId || !sessionKey) return;
+
+    const payload = {
+      playerId: playerId,
+      sessionKey: sessionKey,
+      reason: String(reason || 'dataChanged'),
+      timestamp: Date.now()
+    };
+
+    if (state.appSyncChannel) {
+      try {
+        state.appSyncChannel.postMessage(payload);
+      } catch (error) {}
+    }
+
+    try {
+      localStorage.setItem(APP_SYNC_SIGNAL_KEY, JSON.stringify(payload));
+    } catch (error) {}
+  }
+
+  function handleExternalAppSyncSignal_(payload) {
+    payload = payload || {};
+
+    const currentPlayerId = String(
+      state.currentPlayer && state.currentPlayer.playerId || ''
+    ).trim();
+    const targetPlayerId = String(payload.playerId || '').trim();
+    const currentSessionKey = getCurrentSessionSyncKey_();
+    const targetSessionKey = String(payload.sessionKey || '').trim();
+    const reason = String(payload.reason || 'dataChanged').trim();
+
+    if (
+      !currentPlayerId ||
+      targetPlayerId !== currentPlayerId ||
+      !currentSessionKey ||
+      targetSessionKey !== currentSessionKey
+    ) {
+      return;
+    }
+
+    if (reason === 'sessionRevoked' || reason === 'passwordChanged') {
+      state.sessionInvalidated = true;
+      clearCurrentSession({ preserveSessionInvalidated: true });
+      showAuth();
+      showAuthMessage(
+        reason === 'passwordChanged'
+          ? '登入密碼已變更，請重新登入。'
+          : '此登入工作階段已登出。'
+      );
+      return;
+    }
+
+    checkHomeSyncState_();
+  }
+
+  function initializeCrossTabSync_() {
+    if ('BroadcastChannel' in window) {
+      try {
+        state.appSyncChannel = new BroadcastChannel(APP_SYNC_CHANNEL_NAME);
+        state.appSyncChannel.onmessage = (event) => {
+          handleExternalAppSyncSignal_(event && event.data || {});
+        };
+      } catch (error) {
+        state.appSyncChannel = null;
+      }
+    }
+
+    window.addEventListener('storage', (event) => {
+      if (event.key !== APP_SYNC_SIGNAL_KEY || !event.newValue) {
+        return;
+      }
+
+      try {
+        handleExternalAppSyncSignal_(JSON.parse(event.newValue));
+      } catch (error) {}
+    });
   }
 
   function handleAppResume_() {
@@ -559,6 +659,7 @@ const STORAGE_KEY = 'yct_current_player';
     state.businessDate = getTaipeiBusinessDate_();
 
     scheduleNextTaipeiMidnightRefresh_();
+    initializeCrossTabSync_();
 
     if (state.homeSyncTimer) {
       window.clearInterval(state.homeSyncTimer);
@@ -579,14 +680,37 @@ const STORAGE_KEY = 'yct_current_player';
     window.addEventListener('focus', handleAppResume_);
   }
 
+  function preloadCriticalBackgrounds_() {
+    const root = document.documentElement;
+    const backgroundAssets = [
+      ['--asset-bg-mobile', 'appBgMobile'],
+      ['--asset-bg-desktop', 'appBgDesktop'],
+      ['--asset-hero-mobile', 'heroMobile'],
+      ['--asset-hero-desktop', 'heroDesktop'],
+      ['--asset-journey-mobile', 'journeyMobile'],
+      ['--asset-journey-desktop', 'journeyDesktop'],
+      ['--asset-game-camp', 'gameCamp'],
+      ['--asset-game-panel', 'gamePanel'],
+      ['--asset-chest-hero', 'chest01']
+    ];
 
+    backgroundAssets.forEach(([cssVar, key]) => {
+      loadManagedImage_(key, IMAGE_ASSETS[key])
+        .then((url) => {
+          root.style.setProperty(cssVar, 'url("' + url + '")');
+        })
+        .catch(() => {
+          if (key.indexOf('chest') === 0) {
+            root.style.setProperty(cssVar, 'url("' + IMAGE_FALLBACK_DATA_URL + '")');
+          }
+        });
+    });
+  }
 
-
-  function hydrateExistingImages_(root, selector) {
+  function hydrateExistingImages_(root) {
     const scope = root || document;
-    const imageSelector = selector || 'img[src], img[data-managed-url]';
 
-    Array.from(scope.querySelectorAll(imageSelector)).forEach((img) => {
+    Array.from(scope.querySelectorAll('img[src], img[data-managed-url]')).forEach((img) => {
       const managedUrl = img.dataset.managedUrl || '';
       const url = managedUrl || img.getAttribute('src') || '';
 
@@ -598,21 +722,18 @@ const STORAGE_KEY = 'yct_current_player';
     });
   }
 
-  function getChestImageAssetKey_(chestId, isOpen) {
+  function getChestImageAssetKey_(chestId) {
     const match = String(chestId || '').match(/Chest_(\d{2})/);
     const id = match ? match[1] : '01';
 
-    return 'chest' + id + (isOpen ? 'Open' : 'Close');
+    return 'chest' + id;
   }
 
-  function getChestImageUrl_(chest, isOpen) {
-    const key = getChestImageAssetKey_(
-      chest && chest.chestId,
-      !!isOpen
-    );
+  function getChestImageUrl_(chest) {
+    const key = getChestImageAssetKey_(chest && chest.chestId);
     const configuredUrl = String(chest && chest.imageUrl || '').trim();
 
-    return configuredUrl || IMAGE_ASSETS[key] || IMAGE_FALLBACK_DATA_URL;
+    return IMAGE_ASSETS[key] || configuredUrl || IMAGE_FALLBACK_DATA_URL;
   }
 
   function setManagedImageSource_(img, url, key, options) {
@@ -952,7 +1073,7 @@ const STORAGE_KEY = 'yct_current_player';
         return;
       }
 
-      deleteMyGroupPost(deleteButton.dataset.deleteGroupPost || '');
+      confirmDeleteMyGroupPost(deleteButton.dataset.deleteGroupPost || '');
     });
     $('#prayerCarousel').addEventListener('click', handleDynamicPrayerOpen);
     $('#prayerExploreList').addEventListener('click', handleDynamicPrayerOpen);
@@ -1016,23 +1137,20 @@ const STORAGE_KEY = 'yct_current_player';
      * 同一個開頁流程連續送出兩次後端請求，且兩次都驗證 Session。
      * 現在直接取得首頁資料；getHomeDashboard 本身已完成 Session 驗證。
      */
-    state.sessionToken = stored.sessionToken;
-    state.sessionInvalidated = false;
+    establishCurrentSession_(stored.sessionToken, null, stored.persistent === true);
 
     setLoading(true, '正在載入旅程…');
 
     loadInitialAppData_()
       .then((res) => {
         if (!isSuccess(res) || !res.data || !res.data.player) {
-          if (isSessionErrorResponse(res)) {
+          if (isSessionErrorResponse(res) || state.sessionInvalidated) {
             setLoading(false);
             return;
           }
 
-          // 網路、GAS 暫時忙碌或 Dashboard 區塊失敗時保留現有
-          // Session，只讓使用者重試首頁資料，不把有效登入狀態清除。
           showInitialLoadError_(
-            getResponseError(res, '首頁資料讀取失敗')
+            getResponseError(res, '首頁資料讀取失敗，請重新載入')
           );
           return;
         }
@@ -1051,48 +1169,51 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function enterHomeWithDashboard_(data) {
-    const dashboardData = Object.assign({}, data || {});
+    data = data || {};
 
-    // 合併登入／註冊 API 會額外回傳 Session。Session 只保留在
-    // state 與既有 localStorage 登入資料，不寫入 Dashboard 快取。
-    delete dashboardData.sessionToken;
-    delete dashboardData.authenticated;
-    delete dashboardData.message;
-
-    state.currentPlayer = dashboardData.player;
-    state.currentCycleId = dashboardData.cycleId ||
-      (dashboardData.cycle && dashboardData.cycle.cycleId) ||
+    state.currentPlayer = data.player;
+    state.currentCycleId = data.cycleId ||
+      (data.cycle && data.cycle.cycleId) ||
       '';
     persistCurrentPlayer();
 
-    state.homeSyncToken = String(dashboardData.syncToken || '').trim();
+    state.homeSyncToken = String(data.syncToken || '').trim();
     state.businessDate = String(
-      dashboardData.businessDate || getTaipeiBusinessDate_()
+      data.businessDate || getTaipeiBusinessDate_()
     ).trim();
 
-    if (dashboardData.taskConfig) {
-      applyTaskConfiguration_(dashboardData.taskConfig);
+    if (data.taskConfig) {
+      applyTaskConfiguration_(data.taskConfig);
     }
 
-    setCache_('dashboard', dashboardData);
+    setCache_('dashboard', data);
     showView('home', {
       skipDataLoad: true
     });
-    // 首頁登入時只初始化固定 data-managed-url 圖示，避免掃描玩家頭像
-    // 等動態 img[src]，造成前一位使用者圖片晚到後覆蓋新資料。
-    hydrateExistingImages_(
-      document.getElementById('homeView'),
-      'img[data-managed-url]'
-    );
-    renderDashboardData_(dashboardData);
+    renderDashboardData_(data);
     setLoading(false);
     window.setTimeout(retryPendingMessageCenterSuppression_, 0);
+    window.setTimeout(promptPasswordChangeIfRequired_, 0);
+  }
+
+  function promptPasswordChangeIfRequired_() {
+    if (!state.currentPlayer || !state.currentPlayer.passwordMustChange) {
+      return;
+    }
+
+    openAccountSettingsModal();
+    setResultMessage(
+      '#accountSettingsMessage',
+      '此帳號目前使用臨時密碼，請先修改登入密碼後再繼續操作。'
+    );
   }
 
   function showInitialLoadError_(message) {
     const safeMessage = message || '資料載入失敗，請重新整理或稍後再試';
 
-    showAuth();
+    closeAllModals();
+    hideAllViews();
+    $('#bottomNav').classList.add('hidden');
     setLoadingError_(
       safeMessage,
       '重新載入',
@@ -1101,24 +1222,42 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function readStoredSession() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-
-      if (!raw) {
-        return {};
-      }
+    const parseStoredSession = (raw, persistent) => {
+      if (!raw) return null;
 
       const parsed = JSON.parse(raw);
+      const sessionToken = String(parsed.sessionToken || '').trim();
+      if (!sessionToken) return null;
 
       return {
-        sessionToken: String(parsed.sessionToken || '').trim(),
+        sessionToken: sessionToken,
         savedAt: parsed.savedAt || '',
-        playerId: parsed.playerId || ''
+        playerId: parsed.playerId || '',
+        persistent: persistent === true
       };
+    };
 
+    try {
+      const temporarySession = parseStoredSession(
+        sessionStorage.getItem(STORAGE_KEY),
+        false
+      );
+      if (temporarySession) return temporarySession;
     } catch (error) {
-      return {};
+      try { sessionStorage.removeItem(STORAGE_KEY); } catch (ignored) {}
     }
+
+    try {
+      const persistentSession = parseStoredSession(
+        localStorage.getItem(STORAGE_KEY),
+        true
+      );
+      if (persistentSession) return persistentSession;
+    } catch (error) {
+      try { localStorage.removeItem(STORAGE_KEY); } catch (ignored) {}
+    }
+
+    return {};
   }
 
   function showAuth() {
@@ -1193,6 +1332,11 @@ const STORAGE_KEY = 'yct_current_player';
     }
   }
 
+  function isModalOpen_(id) {
+    const modal = $('#' + id);
+    return !!modal && !modal.classList.contains('hidden');
+  }
+
   function openModal(id) {
     $('#' + id).classList.remove('hidden');
   }
@@ -1234,136 +1378,14 @@ const STORAGE_KEY = 'yct_current_player';
     state.pendingConfirm = null;
   }
 
-  function persistAuthenticatedSession_(data) {
-    data = data || {};
-
-    const sessionToken = String(data.sessionToken || '').trim();
-    const player = data.player || null;
-
-    if (!sessionToken || !player || !player.playerId) {
-      return false;
-    }
-
-    state.sessionToken = sessionToken;
-    state.sessionInvalidated = false;
-    state.currentPlayer = player;
-    persistCurrentPlayer();
-    return true;
-  }
-
-  function startAuthenticationRequest_(action, apiName, args) {
-    callServer(apiName, ...(args || []))
-      .then((res) => {
-        applyAuthenticationResponse_(action, res);
-      })
-      .catch((error) => {
-        setLoading(false);
-
-        if (action === 'register') {
-          if (error && error.code === 'AUTH_RESPONSE_TIMEOUT') {
-            const payload = args && args[0] ? args[0] : {};
-            closeModal('registerModal');
-            showAuth();
-            $('#loginName').value = String(payload.loginName || '').trim();
-            $('#loginPassword').value = '';
-            showAuthMessage(
-              '註冊結果無法確認：' + getErrorMessage(error) +
-              '。請先使用剛才的帳號與密碼登入；若仍無法登入，再重新註冊。'
-            );
-            return;
-          }
-
-          setResultMessage(
-            '#registerMessage',
-            getErrorMessage(error)
-          );
-          return;
-        }
-
-        showAuthMessage(
-          '登入連線失敗：' + getErrorMessage(error) +
-          '。請確認網路後重新登入。'
-        );
-      });
-  }
-
-  function applyAuthenticationResponse_(action, res) {
-    const isRegister = action === 'register';
-
-    if (!isSuccess(res)) {
-      if (
-        res &&
-        res.code === 'DASHBOARD_LOAD_FAILED' &&
-        res.data &&
-        res.data.authenticated &&
-        persistAuthenticatedSession_(res.data)
-      ) {
-        if (isRegister) {
-          closeModal('registerModal');
-        } else {
-          $('#loginPassword').value = '';
-        }
-
-        showInitialLoadError_(
-          getResponseError(
-            res,
-            isRegister
-              ? '帳號已建立，但首頁資料讀取失敗'
-              : '登入成功，但首頁資料讀取失敗'
-          )
-        );
-        return false;
-      }
-
-      setLoading(false);
-
-      if (isRegister) {
-        setResultMessage(
-          '#registerMessage',
-          getResponseError(res, '註冊失敗')
-        );
-      } else {
-        showAuthMessage(getResponseError(res, '登入失敗'));
-      }
-
-      return false;
-    }
-
-    if (!persistAuthenticatedSession_(res.data)) {
-      clearCurrentSession();
-      showAuth();
-      setLoading(false);
-      showAuthMessage(
-        (isRegister ? '註冊' : '登入') +
-        '成功，但登入憑證不完整'
-      );
-      return false;
-    }
-
-    if (isRegister) {
-      closeModal('registerModal');
-    } else {
-      $('#loginPassword').value = '';
-    }
-
-    enterHomeWithDashboard_(res.data);
-
-    if (state.currentPlayer && state.currentPlayer.passwordMustChange) {
-      openAccountSettingsModal();
-      setResultMessage(
-        '#accountSettingsMessage',
-        '此帳號目前使用臨時密碼，請先修改登入密碼後再繼續操作。'
-      );
-    }
-
-    return true;
-  }
-
   function handleLogin(event) {
     event.preventDefault();
 
     const playerName = $('#loginName').value.trim();
     const passwordCode = $('#loginPassword').value.trim();
+    const keepLogin = !!(
+      $('#keepLoginCheckbox') && $('#keepLoginCheckbox').checked
+    );
 
     if (!playerName || !passwordCode) {
       showAuthMessage(!playerName ? '請輸入登入帳號' : '請輸入登入密碼');
@@ -1372,19 +1394,42 @@ const STORAGE_KEY = 'yct_current_player';
 
     setLoading(true, '正在載入旅程…');
 
-    startAuthenticationRequest_(
-      'login',
-      'loginPlayerWithDashboard',
-      [playerName, passwordCode]
-    );
+    callServer('loginPlayer', playerName, passwordCode)
+      .then((res) => {
+        const authData = res && res.data || {};
+        const dashboard = authData.dashboard || null;
+
+        if (!isSuccess(res) || !dashboard || !dashboard.player) {
+          setLoading(false);
+          showAuthMessage(getResponseError(res, '登入失敗'));
+          return;
+        }
+
+        establishCurrentSession_(
+          authData.sessionToken,
+          authData.player || dashboard.player,
+          keepLogin
+        );
+        $('#loginPassword').value = '';
+        enterHomeWithDashboard_(dashboard);
+      })
+      .catch((error) => {
+        showAuth();
+        showAuthMessage(getErrorMessage(error));
+        setLoading(false);
+      });
   }
 
-
+  function initRegisterAvatar() {
+    state.registerAvatar = buildRandomAvatar('male');
+    renderRegisterAvatar();
+  }
 
   function openRegisterModal() {
     $('#registerName').value = '';
     $('#registerLoginName').value = '';
     $('#registerPassword').value = '';
+    $('#registerPasswordConfirm').value = '';
     $('#registerBirthYear').value = '';
     $('#registerAvatarGender').value = 'male';
 
@@ -1567,7 +1612,9 @@ const STORAGE_KEY = 'yct_current_player';
   function handleRegister(event) {
     event.preventDefault();
 
+    let sessionEstablished = false;
     const avatar = state.registerAvatar;
+    const passwordConfirmation = $('#registerPasswordConfirm').value.trim();
     const birthYearText = $('#registerBirthYear').value.trim();
     const currentYear = new Date().getFullYear();
 
@@ -1610,6 +1657,19 @@ const STORAGE_KEY = 'yct_current_player';
     }
 
     if (
+      payload.passwordCode.length < 8 ||
+      payload.passwordCode.length > 64
+    ) {
+      setResultMessage('#registerMessage', '密碼長度需為 8 至 64 碼');
+      return;
+    }
+
+    if (payload.passwordCode !== passwordConfirmation) {
+      setResultMessage('#registerMessage', '兩次輸入的密碼不一致');
+      return;
+    }
+
+    if (
       !payload.displayName ||
       payload.displayName.length < 2 ||
       payload.displayName.length > 20
@@ -1635,11 +1695,62 @@ const STORAGE_KEY = 'yct_current_player';
 
     setLoading(true, '正在載入旅程…');
 
-    startAuthenticationRequest_(
-      'register',
-      'registerPlayerWithDashboard',
-      [payload]
-    );
+    callServer('registerPlayer', payload)
+      .then((res) => {
+        const authData = res && res.data || {};
+        const dashboard = authData.dashboard || null;
+
+        if (!isSuccess(res) || !dashboard || !dashboard.player) {
+          setLoading(false);
+
+          if (String(res && res.code || '') === 'ACCOUNT_CREATED_DASHBOARD_FAILED') {
+            const loginNameInput = $('#loginName');
+            const loginPasswordInput = $('#loginPassword');
+
+            if (loginNameInput) {
+              loginNameInput.value = payload.loginName;
+            }
+
+            if (loginPasswordInput) {
+              loginPasswordInput.value = '';
+            }
+
+            closeModal('registerModal');
+            setResultMessage(
+              '#authMessage',
+              getResponseError(
+                res,
+                '帳號已建立，請改用剛才設定的帳號與密碼登入。'
+              )
+            );
+
+            globalThis.setTimeout(() => {
+              if (loginPasswordInput) {
+                loginPasswordInput.focus();
+              }
+            }, 0);
+            return;
+          }
+
+          setResultMessage(
+            '#registerMessage',
+            getResponseError(res, '註冊失敗')
+          );
+          return;
+        }
+
+        establishCurrentSession_(
+          authData.sessionToken,
+          authData.player || dashboard.player,
+          false
+        );
+        closeModal('registerModal');
+        enterHomeWithDashboard_(dashboard);
+      })
+      .catch((error) => {
+        setResultMessage('#registerMessage', getErrorMessage(error));
+        setLoading(false);
+      });
   }
 
   function createEmptyMessageCenterState_() {
@@ -1673,12 +1784,25 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function applyMessageCenterData_(data, allowAutoOpen) {
+    const previousSelectedKey = String(state.selectedMessageKey || '');
+    const wasOpen = isModalOpen_('messageCenterModal');
+
     state.messageCenter = normalizeMessageCenterData_(data);
 
     // 後端背景寫入尚未完成時，先套用本機已確認的「今日不再顯示」。
     // 這可避免使用者關閉訊息後立即重新整理，訊息因後端狀態尚未落盤而再次跳出。
     applyQueuedMessageCenterSuppressionLocally_();
     renderHomeMessageBadge_();
+
+    if (wasOpen) {
+      state.selectedMessageKey = previousSelectedKey;
+
+      if (!getSelectedMessageCenterItem_()) {
+        selectDefaultMessageCenterItem_();
+      }
+
+      renderMessageCenter_();
+    }
 
     if (allowAutoOpen) {
       maybeAutoOpenMessageCenter_();
@@ -1692,7 +1816,10 @@ const STORAGE_KEY = 'yct_current_player';
       return;
     }
 
-    badge.classList.remove('hidden');
+    badge.classList.toggle(
+      'hidden',
+      !(state.messageCenter && state.messageCenter.hasBadge)
+    );
   }
 
   function maybeAutoOpenMessageCenter_() {
@@ -1731,6 +1858,8 @@ const STORAGE_KEY = 'yct_current_player';
     if (!state.currentPlayer) {
       return;
     }
+
+    setResultMessage('#messageCenterStatusMessage', '');
 
     if (!options.refresh) {
       selectDefaultMessageCenterItem_();
@@ -1774,8 +1903,14 @@ const STORAGE_KEY = 'yct_current_player';
       center.defaultMessageType,
       center.defaultMessageId
     );
-    const fallback = firstAnnouncement ||
-      preferred ||
+    const fallback = preferred ||
+      (center.rewardNotifications || []).find((item) =>
+        String(item.rewardStatus || '').trim() === 'NOTIFIED'
+      ) ||
+      (center.rewardNotifications || []).find((item) => !item.isRead) ||
+      (center.specialTasks || []).find((item) => !item.isRead) ||
+      (center.announcements || []).find((item) => !item.isRead) ||
+      firstAnnouncement ||
       (center.specialTasks || [])[0] ||
       (center.rewardNotifications || [])[0] ||
       null;
@@ -2068,15 +2203,14 @@ const STORAGE_KEY = 'yct_current_player';
       return;
     }
 
-    message.isRead = true;
-    message.readAt = message.readAt || new Date().toISOString();
+    const messageKey = buildMessageCenterItemKey_(message);
 
-    if (autoShown) {
-      message.autoShownAt = message.autoShownAt || new Date().toISOString();
+    if (!messageKey || state.messageReadInFlight.has(messageKey)) {
+      return;
     }
 
-    state.selectedMessageKey = buildMessageCenterItemKey_(message);
-    renderMessageCenter_();
+    state.messageReadInFlight.add(messageKey);
+    setResultMessage('#messageCenterStatusMessage', '');
 
     callServer('markPlayerMessageRead', {
       messageType: message.messageType,
@@ -2086,11 +2220,37 @@ const STORAGE_KEY = 'yct_current_player';
     })
       .then((res) => {
         if (!isSuccess(res)) {
-          console.error(getResponseError(res, '標記訊息已讀失敗'));
+          throw new Error(getResponseError(res, '標記訊息已讀失敗'));
         }
+
+        const savedStatus = (res.data && res.data.status) || {};
+        message.isRead = true;
+        message.readAt = savedStatus.readAt || message.readAt || new Date().toISOString();
+
+        if (autoShown) {
+          message.autoShownAt = savedStatus.autoShownAt ||
+            message.autoShownAt ||
+            new Date().toISOString();
+        }
+
+        state.selectedMessageKey = messageKey;
+        state.messageCenter.hasBadge = getAllMessageCenterItems_().some((item) =>
+          !item.isRead ||
+          (item.messageType === 'REWARD_NOTIFICATION' &&
+            String(item.rewardStatus || '').trim() === 'NOTIFIED')
+        );
+        renderHomeMessageBadge_();
+        renderMessageCenter_();
+        notifyOtherAppInstances_('messageRead');
       })
       .catch((error) => {
-        console.error(getErrorMessage(error));
+        setResultMessage(
+          '#messageCenterStatusMessage',
+          '訊息尚未標記為已讀：' + getErrorMessage(error)
+        );
+      })
+      .finally(() => {
+        state.messageReadInFlight.delete(messageKey);
       });
   }
 
@@ -2370,6 +2530,7 @@ const STORAGE_KEY = 'yct_current_player';
           state.messageCenterSuppressionRetryAttempts.delete(key);
           removeMessageCenterSuppressionRetry_(record);
           markMessageCenterSuppressedLocally_(record);
+          notifyOtherAppInstances_('messageSuppressed');
         })
         .catch((error) => {
           const nextAttempts = attempts + 1;
@@ -2485,6 +2646,7 @@ const STORAGE_KEY = 'yct_current_player';
       player.displayName || player.playerName || '';
     $('#currentPasswordCode').value = '';
     $('#newPasswordCode').value = '';
+    $('#confirmNewPasswordCode').value = '';
     setResultMessage('#accountSettingsMessage', '', false);
     openModal('accountSettingsModal');
   }
@@ -2541,9 +2703,26 @@ const STORAGE_KEY = 'yct_current_player';
 
     const currentPasswordCode = $('#currentPasswordCode').value.trim();
     const newPasswordCode = $('#newPasswordCode').value.trim();
+    const confirmNewPasswordCode = $('#confirmNewPasswordCode').value.trim();
 
-    if (!currentPasswordCode || !newPasswordCode) {
-      setResultMessage('#accountSettingsMessage', '請輸入目前登入密碼與新登入密碼');
+    if (!currentPasswordCode || !newPasswordCode || !confirmNewPasswordCode) {
+      setResultMessage(
+        '#accountSettingsMessage',
+        '請完整輸入目前密碼、新密碼與確認密碼'
+      );
+      return;
+    }
+
+    if (newPasswordCode.length < 8 || newPasswordCode.length > 64) {
+      setResultMessage(
+        '#accountSettingsMessage',
+        '新登入密碼長度需為 8 至 64 碼'
+      );
+      return;
+    }
+
+    if (newPasswordCode !== confirmNewPasswordCode) {
+      setResultMessage('#accountSettingsMessage', '兩次輸入的新密碼不一致');
       return;
     }
 
@@ -2565,7 +2744,9 @@ const STORAGE_KEY = 'yct_current_player';
 
         $('#currentPasswordCode').value = '';
         $('#newPasswordCode').value = '';
+        $('#confirmNewPasswordCode').value = '';
         closeModal('accountSettingsModal');
+        notifyOtherAppInstances_('passwordChanged');
         clearCurrentSession();
         showAuth();
         showAuthMessage(
@@ -2587,6 +2768,7 @@ const STORAGE_KEY = 'yct_current_player';
     setResultMessage('#vitalGroupsMessage', '', false);
     updateVitalGroupModalState(state.vitalGroups || []);
     openModal('vitalGroupsModal');
+    invalidateCache_('groupInfo');
     loadVitalGroups();
   }
 
@@ -2671,31 +2853,51 @@ const STORAGE_KEY = 'yct_current_player';
     }
 
     $('#vitalGroupsList').innerHTML = groups.map((group) => {
-      const roleText = group.role === 'owner' ? '建立者' : '成員';
-      const members = (group.members || []).map((member) => {
+      const roleText = group.role === 'owner' ? '負責人' : '成員';
+      const groupEnabled = group.enabled !== false;
+      const groupMembers = group.members || [];
+      const members = groupMembers.map((member) => {
         return escapeHtml(member.playerName || '成員') +
-          (member.role === 'owner' ? '（建立者）' : '');
+          (member.role === 'owner' ? '（負責人）' : '');
       }).join('、');
+      const ownershipActions = group.role === 'owner' && groupEnabled
+        ? groupMembers.filter((member) => {
+            return member.role !== 'owner' && String(member.playerId || '').trim();
+          }).map((member) => {
+            return '<button class="mini-outline-btn" type="button" ' +
+              'data-action="transfer-owner" data-group-id="' +
+              escapeHtml(group.groupId) + '" data-player-id="' +
+              escapeHtml(member.playerId) + '" data-player-name="' +
+              escapeHtml(member.playerName || '成員') + '">移交給 ' +
+              escapeHtml(member.playerName || '成員') + '</button>';
+          }).join('')
+        : '';
 
       return [
         '<article class="vital-group-card">',
         '<div>',
         '<strong>' + escapeHtml(group.groupName || '活力組') + '</strong>',
         '<p>' + escapeHtml(roleText) + '｜' +
-          Number(group.memberCount || 0) + ' 人</p>',
-        group.inviteCode
+          Number(group.memberCount || 0) + ' 人' +
+          (groupEnabled ? '' : '｜已停用') +
+          '</p>',
+        groupEnabled && group.inviteCode
           ? '<span class="invite-code-chip">邀請碼 ' +
             escapeHtml(group.inviteCode) +
             '</span>'
           : '',
         members ? '<small class="member-line">' + members + '</small>' : '',
+        groupEnabled
+          ? ''
+          : '<small class="member-line">此活力組目前已停用，相關小組功能暫停使用。</small>',
         '</div>',
         '<div class="vital-group-actions">',
-        group.inviteCode
+        groupEnabled && group.inviteCode
           ? '<button class="mini-outline-btn" type="button" data-action="copy-invite" data-code="' +
             escapeHtml(group.inviteCode) +
             '">複製邀請碼</button>'
           : '',
+        ownershipActions,
         '<button class="mini-outline-btn danger-outline-btn" type="button" data-action="leave-group" data-group-id="' +
           escapeHtml(group.groupId) +
           '">離開</button>',
@@ -2836,8 +3038,34 @@ const STORAGE_KEY = 'yct_current_player';
       return;
     }
 
+    if (action === 'transfer-owner') {
+      const newOwnerPlayerId = String(button.dataset.playerId || '').trim();
+      const newOwnerName = String(button.dataset.playerName || '該成員').trim();
+
+      if (!newOwnerPlayerId) return;
+
+      openConfirmModal({
+        title: '移交活力組負責人',
+        heading: '確定將負責人移交給 ' + newOwnerName + ' 嗎？',
+        description: '移交完成後，你會保留為一般成員；若要離組，可再執行離開。',
+        confirmText: '確認移交',
+        handler: () => transferVitalGroupOwnership(
+          groupId,
+          newOwnerPlayerId,
+          newOwnerName
+        )
+      });
+      return;
+    }
+
     if (action === 'leave-group') {
-      leaveVitalGroup(groupId);
+      openConfirmModal({
+        title: '離開活力組',
+        heading: '確定要離開這個活力組嗎？',
+        description: '若你是最後一位成員，離開後這個活力組與邀請碼會一併關閉。',
+        confirmText: '確認離開',
+        handler: () => leaveVitalGroup(groupId)
+      });
       return;
     }
 
@@ -2895,6 +3123,40 @@ const STORAGE_KEY = 'yct_current_player';
     setResultMessage('#vitalGroupsMessage', '邀請碼：' + code, true);
   }
 
+  function transferVitalGroupOwnership(groupId, newOwnerPlayerId, newOwnerName) {
+    setLoading(true, '移交活力組負責人...');
+
+    callServer('transferVitalGroupOwnership', {
+      groupId: groupId,
+      newOwnerPlayerId: newOwnerPlayerId
+    })
+      .then((res) => {
+        if (!isSuccess(res)) {
+          setResultMessage(
+            '#vitalGroupsMessage',
+            getResponseError(res, '移交活力組負責人失敗')
+          );
+          return;
+        }
+
+        invalidateByRule_('groupChanged');
+        notifyOtherAppInstances_('dataChanged');
+        setResultMessage(
+          '#vitalGroupsMessage',
+          res.data.message || ('已將負責人移交給 ' + newOwnerName),
+          true
+        );
+        loadVitalGroups();
+        refreshDashboard(false);
+      })
+      .catch((error) => {
+        setResultMessage('#vitalGroupsMessage', getErrorMessage(error));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }
+
   function leaveVitalGroup(groupId) {
     setLoading(true, '離開活力組...');
 
@@ -2929,19 +3191,19 @@ const STORAGE_KEY = 'yct_current_player';
 
   function refreshDashboard(showLoading) {
     if (!state.currentPlayer) {
-      return;
+      return Promise.resolve();
     }
 
     if (isCacheValid_('dashboard')) {
       renderDashboardData_(getCache_('dashboard'));
-      return;
+      return refreshOpenSynchronizedViews_();
     }
 
     if (showLoading) {
       setLoading(true, '讀取首頁資料...');
     }
 
-    loadOnce_('dashboard', () => callServer(
+    return loadOnce_('dashboard', () => callServer(
       'getHomeDashboard',
       state.currentPlayer.playerId
     ))
@@ -2951,7 +3213,7 @@ const STORAGE_KEY = 'yct_current_player';
             '#homeMessage',
             getResponseError(res, '首頁資料讀取失敗')
           );
-          return;
+          return null;
         }
 
         const data = res.data || {};
@@ -3004,10 +3266,11 @@ const STORAGE_KEY = 'yct_current_player';
         renderHomeChestSummary(state.chestSummary);
         renderDailyStatus();
         renderWeeklyTaskStatus();
-        renderGroupJourney(state.groupJourney);
-
         renderHomeSocial(data.social || {});
+        renderGroupJourney(state.groupJourney);
         maybePromptCycleAdvance(data.cycleAdvance);
+
+        return refreshOpenSynchronizedViews_();
       })
       .catch((error) => {
         setResultMessage('#homeMessage', getErrorMessage(error));
@@ -3070,9 +3333,8 @@ const STORAGE_KEY = 'yct_current_player';
     renderHomeChestSummary(state.chestSummary);
     renderDailyStatus();
     renderWeeklyTaskStatus();
-    renderGroupJourney(state.groupJourney);
-
     renderHomeSocial(data.social || {});
+    renderGroupJourney(state.groupJourney);
     maybePromptCycleAdvance(data.cycleAdvance);
   }
 
@@ -3093,11 +3355,19 @@ const STORAGE_KEY = 'yct_current_player';
 
     state.dismissedCycleAdvancePrompts[promptKey] = true;
 
+    const pendingChestCount = Number(cycleAdvance.pendingChestCount || 0);
+    const description = cycleAdvance.prompt || (
+      pendingChestCount > 0
+        ? '你已完成本週目生命成長旅程。尚有 ' +
+          pendingChestCount +
+          ' 個寶箱未領取；進入下一週目後仍會保留在可領取清單，不會自動代領。是否繼續？'
+        : '你已完成本週目生命成長旅程，是否進入下一週目？'
+    );
+
     openConfirmModal({
       title: '進入下一週目',
       heading: '是否進入下一週目？',
-      description: cycleAdvance.prompt ||
-        '你已完成本週目生命成長旅程，是否進入下一週目？',
+      description: description,
       confirmText: '進入下一週目',
       handler: () => advanceToNextCycle(cycleAdvance)
     });
@@ -3238,6 +3508,116 @@ const STORAGE_KEY = 'yct_current_player';
       : '尚未設定照顧區、大區或活力組';
   }
 
+  function refreshOpenSynchronizedViews_() {
+    const infoModalTitle = isModalOpen_('infoModal')
+      ? String($('#infoModalTitle').textContent || '').trim()
+      : '';
+    const collectionOpen = infoModalTitle === '寶藏收藏';
+    const contributionOpen = infoModalTitle === '同行貢獻';
+    const detailOpen = isModalOpen_('chestDetailModal') &&
+      !!String(state.selectedChestDetail && state.selectedChestDetail.chestId || '').trim();
+    const jobs = [];
+
+    if (contributionOpen) {
+      invalidateCache_('contribution');
+      jobs.push(
+        callServer('getMyGroupContributionSummary')
+          .then((res) => {
+            if (
+              !isModalOpen_('infoModal') ||
+              String($('#infoModalTitle').textContent || '').trim() !== '同行貢獻'
+            ) {
+              return;
+            }
+
+            if (!isSuccess(res)) {
+              $('#infoModalContent').innerHTML =
+                '<div class="empty-card">' +
+                escapeHtml(getResponseError(res, '同行貢獻讀取失敗')) +
+                '</div>';
+              return;
+            }
+
+            const data = res.data || {};
+            setCache_('contribution', data);
+            $('#infoModalContent').innerHTML = buildGroupContributionModalHtml(data);
+            hydrateExistingImages_($('#infoModalContent'));
+          })
+          .catch((error) => {
+            if (
+              isModalOpen_('infoModal') &&
+              String($('#infoModalTitle').textContent || '').trim() === '同行貢獻'
+            ) {
+              $('#infoModalContent').innerHTML =
+                '<div class="empty-card">' +
+                escapeHtml(getErrorMessage(error)) +
+                '</div>';
+            }
+          })
+      );
+    }
+
+    if (collectionOpen || detailOpen) {
+      invalidateCache_('chestCollection');
+      invalidateCache_('chestSettingsForPlayer');
+
+      jobs.push(
+        callServer('getPlayerChestCollection')
+          .then((res) => {
+            if (!isSuccess(res)) {
+              throw new Error(getResponseError(res, '讀取寶藏收藏失敗'));
+            }
+
+            const collection = res.data || {};
+            setCache_('chestCollection', collection);
+            setCache_(
+              'chestSettingsForPlayer',
+              Array.isArray(collection.chests) ? collection.chests : []
+            );
+
+            if (!collection.isPreviousCycle) {
+              state.chestSummary = {
+                earnedCount: collection.earnedCount || 0,
+                totalCount: collection.totalCount || 8
+              };
+              setCache_('chestSummary', state.chestSummary);
+              renderHomeChestSummary(state.chestSummary);
+            }
+
+            if (
+              collectionOpen &&
+              isModalOpen_('infoModal') &&
+              String($('#infoModalTitle').textContent || '').trim() === '寶藏收藏'
+            ) {
+              $('#infoModalContent').innerHTML = renderChestCollectionHtml(collection);
+              hydrateExistingImages_($('#infoModalContent'));
+            }
+
+            if (detailOpen && isModalOpen_('chestDetailModal')) {
+              const selected = state.selectedChestDetail || {};
+              const chest = (collection.chests || []).find((item) =>
+                String(item.chestId || '') === String(selected.chestId || '') &&
+                String(item.cycleId || collection.cycleId || '') ===
+                  String(selected.cycleId || '')
+              );
+
+              if (chest) {
+                applyChestDetailModalData_(
+                  buildChestDetailViewModel_(chest, collection.cycleId),
+                  false
+                );
+              }
+            }
+          })
+          .catch(() => {})
+      );
+    }
+
+    return jobs.length
+      ? Promise.all(jobs).then(() => undefined)
+      : Promise.resolve();
+  }
+
   function openChestCollectionModal() {
     closeModal('chestDetailModal');
 
@@ -3258,18 +3638,19 @@ const STORAGE_KEY = 'yct_current_player';
         })
     )
       .then((data) => {
-        state.chestSummary = {
-          earnedCount: data.earnedCount || 0,
-          totalCount: data.totalCount || 8
-        };
+        if (!data.isPreviousCycle) {
+          state.chestSummary = {
+            earnedCount: data.earnedCount || 0,
+            totalCount: data.totalCount || 8
+          };
 
-        setCache_('chestSummary', state.chestSummary);
+          setCache_('chestSummary', state.chestSummary);
+          renderHomeChestSummary(state.chestSummary);
+        }
         setCache_(
           'chestSettingsForPlayer',
           Array.isArray(data.chests) ? data.chests : []
         );
-
-        renderHomeChestSummary(state.chestSummary);
 
         $('#infoModalContent').innerHTML = renderChestCollectionHtml(data);
         hydrateExistingImages_($('#infoModalContent'));
@@ -3282,6 +3663,39 @@ const STORAGE_KEY = 'yct_current_player';
       });
   }
 
+  function buildChestDetailViewModel_(chest, collectionCycleId) {
+    chest = chest || {};
+
+    const hasEarned = !!chest.earned;
+    const hasClaimed = !!chest.claimed;
+    const hasFulfilled = !!chest.fulfilled;
+    const rewardType = String(
+      chest.claimRewardType || chest.rewardType || 'other'
+    );
+    const chestName = chest.chestName || chest.chestId || '寶箱';
+    const chestDetail = chest.displayRewardDescription ||
+      chest.rewardDescription ||
+      '尚無獎勵說明。';
+    const chestStatus = hasEarned
+      ? (rewardType === 'other'
+          ? (hasFulfilled ? '已發放' : (hasClaimed ? '待發放' : '已獲得'))
+          : (hasClaimed ? '已領取' : '已獲得'))
+      : '待取得';
+
+    return {
+      chestId: String(chest.chestId || ''),
+      cycleId: String(chest.cycleId || collectionCycleId || ''),
+      chestName: chestName,
+      chestStatus: chestStatus,
+      chestDetail: chestDetail,
+      chestImage: getChestImageUrl_(chest),
+      hasEarned: hasEarned,
+      hasClaimed: hasClaimed,
+      hasFulfilled: hasFulfilled,
+      rewardType: rewardType
+    };
+  }
+
   function renderChestCollectionHtml(data) {
     const chests = data && Array.isArray(data.chests)
       ? data.chests
@@ -3289,6 +3703,8 @@ const STORAGE_KEY = 'yct_current_player';
 
     const earned = Math.max(0, Number(data && data.earnedCount || 0));
     const total = Math.max(1, Number(data && data.totalCount || 8));
+    const isPreviousCycle = !!(data && data.isPreviousCycle);
+    const collectionCycleId = String(data && data.cycleId || '');
 
     if (!chests.length) {
       return [
@@ -3303,42 +3719,43 @@ const STORAGE_KEY = 'yct_current_player';
       '<div class="treasure-summary-card">',
       '<div class="treasure-summary-icon" aria-hidden="true"></div>',
       '<div class="treasure-summary-text">',
-      '<span>本週目收藏進度</span>',
+      '<span>' + (isPreviousCycle ? '前一週目待領寶箱' : '本週目收藏進度') + '</span>',
       '<strong>已獲得 ' + earned + ' / ' + total + '</strong>',
       '</div>',
       '</div>',
+      isPreviousCycle
+        ? '<div class="empty-card">' +
+            escapeHtml(
+              data.collectionNotice ||
+              '請先領取前一週目尚未領取的寶箱。'
+            ) +
+          '</div>'
+        : '',
       '<div class="treasure-collection-grid">',
 
       chests.map((chest) => {
-        const hasEarned = !!chest.earned;
-        const hasClaimed = !!chest.claimed;
-        const chestName = chest.chestName || chest.chestId || '寶箱';
-        const detailText =
-          chest.displayRewardDescription ||
-          chest.rewardDescription ||
-          '尚無獎勵說明。';
-        const chestStatus = hasEarned
-          ? (hasClaimed ? '已領取' : '已獲得')
-          : '待取得';
-        const chestImage = getChestImageUrl_(chest, hasEarned);
+        const view = buildChestDetailViewModel_(chest, collectionCycleId);
 
         return [
           '<button ',
           'type="button" ',
           'class="treasure-collection-item ' +
-            (hasEarned ? 'earned' : 'locked') + '" ',
-          'data-chest-id="' + escapeHtml(chest.chestId || '') + '" ',
-          'data-chest-name="' + escapeHtml(chestName) + '" ',
-          'data-chest-status="' + escapeHtml(chestStatus) + '" ',
-          'data-chest-detail="' + escapeHtml(detailText) + '" ',
-          'data-chest-image="' + escapeHtml(chestImage) + '" ',
-          'data-chest-claimed="' + (hasClaimed ? '1' : '0') + '" ',
-          'data-chest-earned="' + (hasEarned ? '1' : '0') + '">',
-          '<div class="treasure-collection-badge">' + chestStatus + '</div>',
+          (view.hasEarned ? 'earned' : 'locked') + '" ',
+          'data-chest-id="' + escapeHtml(view.chestId) + '" ',
+          'data-chest-cycle-id="' + escapeHtml(view.cycleId) + '" ',
+          'data-chest-name="' + escapeHtml(view.chestName) + '" ',
+          'data-chest-status="' + escapeHtml(view.chestStatus) + '" ',
+          'data-chest-detail="' + escapeHtml(view.chestDetail) + '" ',
+          'data-chest-image="' + escapeHtml(view.chestImage) + '" ',
+          'data-chest-claimed="' + (view.hasClaimed ? '1' : '0') + '" ',
+          'data-chest-fulfilled="' + (view.hasFulfilled ? '1' : '0') + '" ',
+          'data-chest-reward-type="' + escapeHtml(view.rewardType) + '" ',
+          'data-chest-earned="' + (view.hasEarned ? '1' : '0') + '">',
+          '<div class="treasure-collection-badge">' + escapeHtml(view.chestStatus) + '</div>',
           '<img src="' + escapeHtml(IMAGE_FALLBACK_DATA_URL) + '" ',
-          'data-image-key="' + escapeHtml(getChestImageAssetKey_(chest.chestId, hasEarned)) + '" ',
-          'data-managed-url="' + escapeHtml(chestImage) + '" alt="">',
-          '<span>' + escapeHtml(chestName) + '</span>',
+          'data-image-key="' + escapeHtml(getChestImageAssetKey_(view.chestId)) + '" ',
+          'data-managed-url="' + escapeHtml(view.chestImage) + '" alt="">',
+          '<span>' + escapeHtml(view.chestName) + '</span>',
           '</button>'
         ].join('');
       }).join(''),
@@ -3357,16 +3774,23 @@ const STORAGE_KEY = 'yct_current_player';
 
     openChestDetailModal({
       chestId: chestButton.dataset.chestId || '',
+      cycleId: chestButton.dataset.chestCycleId || '',
       chestName: chestButton.dataset.chestName || '寶箱資訊',
       chestStatus: chestButton.dataset.chestStatus || '待取得',
       chestDetail: chestButton.dataset.chestDetail || '尚無獎勵說明。',
       chestImage: chestButton.dataset.chestImage || '',
       hasEarned: chestButton.dataset.chestEarned === '1',
-      hasClaimed: chestButton.dataset.chestClaimed === '1'
+      hasClaimed: chestButton.dataset.chestClaimed === '1',
+      hasFulfilled: chestButton.dataset.chestFulfilled === '1',
+      rewardType: chestButton.dataset.chestRewardType || 'other'
     });
   }
 
   function openChestDetailModal(chest) {
+    applyChestDetailModalData_(chest, true);
+  }
+
+  function applyChestDetailModalData_(chest, shouldFocus) {
     chest = chest || {};
 
     const chestName = chest.chestName || '寶箱資訊';
@@ -3390,8 +3814,11 @@ const STORAGE_KEY = 'yct_current_player';
 
     state.selectedChestDetail = {
       chestId: String(chest.chestId || ''),
+      cycleId: String(chest.cycleId || ''),
       hasEarned: !!chest.hasEarned,
-      hasClaimed: !!chest.hasClaimed
+      hasClaimed: !!chest.hasClaimed,
+      hasFulfilled: !!chest.hasFulfilled,
+      rewardType: String(chest.rewardType || 'other')
     };
 
     if (claimButton) {
@@ -3400,7 +3827,9 @@ const STORAGE_KEY = 'yct_current_player';
       if (!chest.hasEarned) {
         claimButton.textContent = '待取得';
       } else if (chest.hasClaimed) {
-        claimButton.textContent = '已領取';
+        claimButton.textContent = chest.rewardType === 'other'
+          ? (chest.hasFulfilled ? '已發放' : '待管理者發放')
+          : '已領取';
       } else {
         claimButton.textContent = '領取獎勵';
       }
@@ -3412,7 +3841,7 @@ const STORAGE_KEY = 'yct_current_player';
       setManagedImageSource_(
         image,
         chestImage,
-        getChestImageAssetKey_(chest.chestId, !!chest.hasEarned)
+        getChestImageAssetKey_(chest.chestId)
       );
     } else {
       image.removeAttribute('src');
@@ -3422,13 +3851,15 @@ const STORAGE_KEY = 'yct_current_player';
 
     openModal('chestDetailModal');
 
-    window.setTimeout(() => {
-      const closeButton = modal.querySelector('#chestClaimRewardBtn');
+    if (shouldFocus !== false) {
+      window.setTimeout(() => {
+        const focusButton = modal.querySelector('#chestClaimRewardBtn');
 
-      if (closeButton) {
-        closeButton.focus();
-      }
-    }, 0);
+        if (focusButton) {
+          focusButton.focus();
+        }
+      }, 0);
+    }
   }
 
   function claimSelectedChestReward() {
@@ -3445,7 +3876,10 @@ const STORAGE_KEY = 'yct_current_player';
       button.textContent = '領取中...';
     }
 
-    callServer('claimPlayerChestReward', { chestId })
+    callServer('claimPlayerChestReward', {
+      chestId,
+      awardCycleId: String(selected.cycleId || '')
+    })
       .then((res) => {
         if (!isSuccess(res)) {
           throw new Error(getResponseError(res, '領取寶箱獎勵失敗'));
@@ -3486,7 +3920,11 @@ const STORAGE_KEY = 'yct_current_player';
           'accountProfile'
         ]);
 
-        if (data.groupJourney) {
+        if (
+          data.groupJourney &&
+          String(selected.cycleId || state.currentCycleId) ===
+            String(state.currentCycleId || '')
+        ) {
           state.groupJourney = data.groupJourney;
 
           if (state.currentPlayer) {
@@ -3503,16 +3941,23 @@ const STORAGE_KEY = 'yct_current_player';
           renderGroupJourney(state.groupJourney);
         }
 
+        const claimedChest = data.claimedChest || data.chest || {};
         state.selectedChestDetail = Object.assign({}, selected, {
-          hasClaimed: true
+          hasClaimed: true,
+          hasFulfilled: !!claimedChest.fulfilled,
+          rewardType: String(claimedChest.rewardType || selected.rewardType || 'other')
         });
+        const statusText = state.selectedChestDetail.rewardType === 'other'
+          ? (state.selectedChestDetail.hasFulfilled ? '已發放' : '待管理者發放')
+          : '已領取';
 
         if (button) {
-          button.textContent = '已領取';
+          button.textContent = statusText;
           button.disabled = true;
         }
 
-        $('#chestDetailModalStatus').textContent = '已領取';
+        $('#chestDetailModalStatus').textContent = statusText;
+        notifyOtherAppInstances_('chestClaimed');
       })
       .catch((error) => {
         if (button) {
@@ -3529,20 +3974,34 @@ const STORAGE_KEY = 'yct_current_player';
 
     const members = social.members || [];
     const posts = social.posts || [];
+    const groupEnabled = social.groupEnabled !== false;
+    const statusMessage = String(social.statusMessage || '').trim();
     state.homeGroupPosts = posts;
+    state.myGroupPost = social.myPost || posts.find((post) => post.isMine) || null;
     state.homeGroupMemberCount = members.length;
+    state.homeGroupEnabled = groupEnabled;
+    state.homeGroupStatusMessage = statusMessage;
 
     $('#homeMemberCountText').textContent = members.length;
-    $('#homeCampMeta').textContent =
-      members.length
-        ? '目前 ' + members.length + ' 位成員同行。'
-        : '尚未加入活力組。';
+    $('#homeCampMeta').textContent = !groupEnabled
+      ? (statusMessage || '此活力組目前已停用。')
+      : (
+        members.length
+          ? '目前 ' + members.length + ' 位成員同行。'
+          : '尚未加入活力組。'
+      );
 
-    renderHeroAnnouncements(posts);
+    renderHeroAnnouncements(groupEnabled ? posts : []);
 
-    $('#homeGroupPosts').innerHTML = posts.length
-      ? '<div class="empty-card">公告已顯示在上方旅程看板。</div>'
-      : '<div class="empty-card">尚無公告。</div>';
+    $('#homeGroupPosts').innerHTML = !groupEnabled
+      ? '<div class="empty-card">' +
+        escapeHtml(statusMessage || '此活力組目前已停用。') +
+        '</div>'
+      : (
+        posts.length
+          ? '<div class="empty-card">公告已顯示在上方旅程看板。</div>'
+          : '<div class="empty-card">尚無公告。</div>'
+      );
   }
 
   function renderHeroAnnouncements(posts) {
@@ -3620,60 +4079,70 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function resetGroupPostEditor() {
+    const hasExistingPost = !!state.myGroupPost;
+    const input = $('#homeGroupPostInput');
+    const submitButton = $('#homeGroupPostSubmitBtn');
+
     state.editingGroupPostId = '';
-    $('#homeGroupPostInput').value = '';
-    $('#homeGroupPostSubmitBtn').textContent = '發布公告';
+    input.value = '';
+    input.disabled = hasExistingPost;
+    submitButton.disabled = hasExistingPost;
+    submitButton.textContent = hasExistingPost
+      ? '已有公告，請編輯原公告'
+      : '發布公告';
     $('#cancelGroupPostEditBtn').classList.add('hidden');
   }
 
   function startEditGroupPost(postId) {
-    const post = (state.homeGroupPosts || [])
-      .find((item) => String(item.postId || '') === String(postId || ''));
+    const post = state.myGroupPost &&
+      String(state.myGroupPost.postId || '') === String(postId || '')
+        ? state.myGroupPost
+        : null;
 
     if (!post) {
-      setResultMessage('#groupPostMessage', '找不到公告資料');
+      setResultMessage('#groupPostMessage', '找不到小組公告資料');
       return;
     }
 
     state.editingGroupPostId = String(postId || '');
+    $('#homeGroupPostInput').disabled = false;
     $('#homeGroupPostInput').value = post.content || '';
+    $('#homeGroupPostSubmitBtn').disabled = false;
     $('#homeGroupPostSubmitBtn').textContent = '儲存公告';
     $('#cancelGroupPostEditBtn').classList.remove('hidden');
-    setResultMessage('#groupPostMessage', '正在編輯公告', true);
+    setResultMessage('#groupPostMessage', '正在編輯小組公告', true);
   }
 
   function renderMyGroupPostList() {
     const list = $('#myGroupPostList');
-    const rows = (state.homeGroupPosts || []).filter((post) => post.isMine);
+    const post = state.myGroupPost;
 
     if (!list) {
       return;
     }
 
-    if (!rows.length) {
+    if (!post) {
       list.innerHTML =
-        '<div class="empty-card">尚無自己發布的公告。</div>';
+        '<div class="empty-card">尚未發布小組公告；每位組員最多 1 則。</div>';
       return;
     }
 
-    list.innerHTML = rows.map((post) => {
-      return [
-        '<article class="group-post-manage-row">',
-        '<div>',
-        '<strong>' + escapeHtml(post.content || '') + '</strong>',
-        '<small>' + escapeHtml(post.createdAt || '') + '</small>',
-        '</div>',
-        '<div class="group-post-actions">',
-        '<button class="mini-outline-btn" type="button" data-edit-group-post="' +
-          escapeHtml(post.postId || '') +
-          '">編輯</button>',
-        '<button class="mini-outline-btn danger-outline-btn" type="button" data-delete-group-post="' +
-          escapeHtml(post.postId || '') +
-          '">刪除</button>',
-        '</div>',
-        '</article>'
-      ].join('');
-    }).join('');
+    list.innerHTML = [
+      '<article class="group-post-manage-row">',
+      '<div>',
+      '<strong>' + escapeHtml(post.content || '') + '</strong>',
+      '<small>' + escapeHtml(post.updatedAt || post.createdAt || '') + '</small>',
+      '</div>',
+      '<div class="group-post-actions">',
+      '<button class="mini-outline-btn" type="button" data-edit-group-post="' +
+        escapeHtml(post.postId || '') +
+        '">編輯</button>',
+      '<button class="mini-outline-btn danger-outline-btn" type="button" data-delete-group-post="' +
+        escapeHtml(post.postId || '') +
+        '">刪除</button>',
+      '</div>',
+      '</article>'
+    ].join('');
   }
 
   function submitHomeGroupPost(event) {
@@ -3700,6 +4169,15 @@ const STORAGE_KEY = 'yct_current_player';
     }
 
     const editingPostId = String(state.editingGroupPostId || '');
+
+    if (!editingPostId && state.myGroupPost) {
+      setResultMessage(
+        '#groupPostMessage',
+        '每位組員只能發布 1 則小組公告，請編輯或刪除原公告。'
+      );
+      return;
+    }
+
     const method = editingPostId ? 'updateGroupPost' : 'createGroupPost';
     if (!editingPostId) {
       state.pendingGroupPostCreateSignature = content;
@@ -3737,6 +4215,11 @@ const STORAGE_KEY = 'yct_current_player';
 
             return Object.assign({}, post, { content: content });
           });
+          state.myGroupPost = Object.assign({}, state.myGroupPost || {}, {
+            postId: editingPostId,
+            content: content,
+            updatedAt: new Date().toLocaleString('zh-TW', { hour12: false })
+          });
           resetGroupPostEditor();
           renderMyGroupPostList();
           invalidateByRule_('groupAnnouncementsChanged');
@@ -3762,6 +4245,20 @@ const STORAGE_KEY = 'yct_current_player';
       .finally(() => {
         setLoading(false);
       });
+  }
+
+  function confirmDeleteMyGroupPost(postId) {
+    if (!state.currentPlayer || !postId || !state.myGroupPost) {
+      return;
+    }
+
+    openConfirmModal({
+      title: '刪除小組公告',
+      heading: '確定要刪除這則小組公告嗎？',
+      description: '刪除後將不再顯示；之後可以重新發布 1 則新的小組公告。',
+      confirmText: '確認刪除',
+      handler: () => deleteMyGroupPost(postId)
+    });
   }
 
   function deleteMyGroupPost(postId) {
@@ -3797,6 +4294,8 @@ const STORAGE_KEY = 'yct_current_player';
         refreshDashboard(false);
         state.homeGroupPosts = (state.homeGroupPosts || [])
           .filter((post) => String(post.postId || '') !== String(postId));
+        state.myGroupPost = null;
+        resetGroupPostEditor();
         renderMyGroupPostList();
       })
       .catch((error) => {
@@ -3832,6 +4331,22 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function renderGroupJourney(group) {
+    if (state.homeGroupEnabled === false) {
+      $('#homeJourneyChapterText').textContent = '已停用';
+
+      const disabledGroupScore = $('#homeGroupScoreText');
+      if (disabledGroupScore) disabledGroupScore.textContent = '0';
+
+      $('#homeJourneyProgressText').textContent = '0%';
+      $('#homeJourneyNextText').textContent =
+        state.homeGroupStatusMessage ||
+        '此活力組目前已停用，相關小組功能暫停使用。';
+      $$('#homeJourneyNodes .journey-node').forEach((node) => {
+        node.classList.remove('passed', 'current');
+      });
+      return;
+    }
+
     const journey = group && group.journey
       ? group.journey
       : {
@@ -4061,6 +4576,11 @@ const STORAGE_KEY = 'yct_current_player';
       note: $('#practiceNote').value.trim()
     };
 
+    if (payload.note.length > 500) {
+      setResultMessage('#practiceModalMessage', '備註不可超過 500 個字');
+      return;
+    }
+
     payload[config.field] = true;
     const pendingDaily = beginPendingMutationRequest_('daily-practice', payload);
     state.pendingDailyRequestId = pendingDaily.requestId;
@@ -4251,6 +4771,11 @@ const STORAGE_KEY = 'yct_current_player';
       lordDayMeeting: toBool(record.lordDayMeeting),
       note: $('#weeklyTaskNote').value.trim()
     };
+
+    if (payload.note.length > 500) {
+      setResultMessage('#weeklyTaskModalMessage', '備註不可超過 500 個字');
+      return;
+    }
 
     payload[config.field] = true;
     const pendingMeeting = beginPendingMutationRequest_('meeting-practice', payload);
@@ -4557,7 +5082,7 @@ function setupPrayerAutoScroll(selector) {
       top: child.offsetTop - target.offsetTop,
       behavior: 'smooth'
     });
-  }, selector === '#homePrayerCarousel' ? 3200 : 3800);
+  }, 3800);
 }
 
 function flipPrayerCarouselPage(
@@ -4923,7 +5448,7 @@ function clearPrayerAutoScroll(selector) {
       const requestId = escapeHtml(request.requestId || '');
       const dateText = escapeHtml(request.createdShortDate || '');
       const titleText = escapeHtml(request.title || '');
-      const prayedCount = Number(request.prayedCount || 0);
+      const prayedCount = Number(request.responseCount || request.prayedCount || 0);
       const canEdit = request.canEdit !== false;
       const canClose = request.canClose !== false;
 
@@ -5266,8 +5791,26 @@ function clearPrayerAutoScroll(selector) {
   function renderMyPrayerDetail(data) {
     const request = data.request || {};
 
+    const responses = Array.isArray(data.responses) ? data.responses : [];
+    const responseCount = Number(
+      data.responseSummary && data.responseSummary.responseCount || responses.length || 0
+    );
+    const responseHtml = responses.length
+      ? responses.map((response) => [
+          '<article class="my-prayer-row">',
+          '<span class="my-prayer-date">' + escapeHtml(response.createdAt || response.prayerDate || '') + '</span>',
+          '<strong class="my-prayer-title">' + escapeHtml(response.responderName || '未知玩家') + '</strong>',
+          '<span class="my-prayer-count">' + escapeHtml(response.responderGroupName || '未分組') + '</span>',
+          '</article>'
+        ].join('')).join('')
+      : '<div class="empty-card">目前尚無人回應代禱</div>';
+
     $('#myPrayerDetailContent').innerHTML = [
-      renderPrayerDetailHtml(request)
+      renderPrayerDetailHtml(request),
+      '<section class="prayer-detail-card">',
+      '<div class="prayer-detail-field"><span>代禱回應</span><strong>共 ' + responseCount + ' 人</strong></div>',
+      '<div class="modal-list">' + responseHtml + '</div>',
+      '</section>'
     ].join('');
 
     const actions = [];
@@ -5347,10 +5890,6 @@ function clearPrayerAutoScroll(selector) {
       return;
     }
 
-    if (!ensureGroupFeatureReady('#prayerEditMessage')) {
-      return;
-    }
-
     const payload = {
       playerId: state.currentPlayer.playerId,
       requestId: request.requestId,
@@ -5406,10 +5945,6 @@ function clearPrayerAutoScroll(selector) {
   }
 
   function closePrayerRequest(requestId) {
-    if (!ensureGroupFeatureReady('#myPrayerDetailMessage')) {
-      return;
-    }
-
     setLoading(true, '關閉代禱事項...');
 
     callServer('closePrayerRequest', {
@@ -5873,6 +6408,7 @@ function clearPrayerAutoScroll(selector) {
     setLoading(true, '登出中...');
 
     const finishLogout = () => {
+      notifyOtherAppInstances_('sessionRevoked');
       clearCurrentSession();
       $('#loginPassword').value = '';
       showAuth();
@@ -5889,23 +6425,102 @@ function clearPrayerAutoScroll(selector) {
       .finally(finishLogout);
   }
 
-  function clearCurrentSession() {
+  function establishCurrentSession_(sessionToken, player, keepLogin) {
+    const normalizedToken = String(sessionToken || '').trim();
+
+    if (!normalizedToken) {
+      throw new Error('登入成功，但後端未回傳有效登入憑證');
+    }
+
+    const previousPlayerId = String(
+      state.currentPlayer && state.currentPlayer.playerId || ''
+    ).trim();
+    const nextPlayerId = String(player && player.playerId || '').trim();
+
+    if (previousPlayerId && previousPlayerId !== nextPlayerId) {
+      clearPendingMutationRequestsForPlayer_(previousPlayerId);
+      clearMessageSuppressionRetryForPlayer_(previousPlayerId);
+    }
+
+    state.sessionGeneration += 1;
+    state.sessionToken = normalizedToken;
+    state.keepLogin = keepLogin === true;
+    state.sessionInvalidated = false;
+    state.currentPlayer = player || null;
+    clearAllAppCache_();
+    persistCurrentPlayer();
+  }
+
+  function clearPendingMutationRequestsForPlayer_(playerId) {
+    playerId = String(playerId || '').trim();
+
+    if (!playerId) {
+      return;
+    }
+
+    const prefix = 'vital-pending-mutation::' + playerId + '::';
+
+    try {
+      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+        const key = localStorage.key(index);
+
+        if (key && key.indexOf(prefix) === 0) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch (error) {}
+  }
+
+  function clearMessageSuppressionRetryForPlayer_(playerId) {
+    playerId = String(playerId || '').trim();
+
+    if (!playerId) {
+      return;
+    }
+
+    const retained = readMessageCenterSuppressionRetryQueue_().filter(
+      (record) => String(record && record.playerId || '').trim() !== playerId
+    );
+
+    writeMessageCenterSuppressionRetryQueue_(retained);
+  }
+
+  function clearCurrentSession(options) {
+    options = options || {};
+
+    const previousPlayerId = String(
+      state.currentPlayer && state.currentPlayer.playerId || ''
+    ).trim();
+
+    state.sessionGeneration += 1;
     state.currentPlayer = null;
     state.sessionToken = '';
-    state.sessionInvalidated = false;
+    state.keepLogin = false;
+    state.sessionInvalidated = !!options.preserveSessionInvalidated;
     state.currentCycleId = '';
-    state.homeSyncCheckInFlight = false;
-    state.lastHomeSyncCheckAt = 0;
+    state.pendingDailyRequestId = '';
+    state.pendingWeeklyRequestId = '';
+    state.pendingPrayerResponseRequestIds = {};
+    state.pendingGroupCreateRequestId = '';
+    state.pendingGroupCreateSignature = '';
+    state.pendingGroupPostCreateRequestId = '';
+    state.pendingGroupPostCreateSignature = '';
+    state.pendingPrayerCreateRequestId = '';
+    state.pendingPrayerCreateSignature = '';
     state.dailyRecord = null;
     state.weeklyTaskRecord = null;
     state.groupJourney = null;
     state.homePrayerItems = [];
     state.homeGroupPosts = [];
+    state.myGroupPost = null;
     state.homeGroupMemberCount = 0;
+    state.homeGroupEnabled = true;
+    state.homeGroupStatusMessage = '';
     state.messageCenter = createEmptyMessageCenterState_();
     state.messageCenterFilter = 'ANNOUNCEMENT';
     state.selectedMessageKey = '';
     state.messageCenterAutoOpenedKey = '';
+    state.messageReadInFlight.clear();
     state.pendingMessageCenterSuppressions.clear();
     state.messageCenterSuppressionFlushInFlight.clear();
     state.messageCenterSuppressionRetryAttempts.clear();
@@ -5918,8 +6533,15 @@ function clearPrayerAutoScroll(selector) {
     state.explorePrayerItems = [];
     state.myPrayerItems = [];
     clearAllAppCache_();
+    clearPendingMutationRequestsForPlayer_(previousPlayerId);
+    clearMessageSuppressionRetryForPlayer_(previousPlayerId);
 
-    localStorage.removeItem(STORAGE_KEY);
+    try {
+      sessionStorage.removeItem(STORAGE_KEY);
+    } catch (ignored) {}
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (ignored) {}
   }
 
   function openInfoModal(title, html) {
@@ -5935,11 +6557,14 @@ function clearPrayerAutoScroll(selector) {
     const player = state.currentPlayer || {};
     const groupId = String(player.groupId || '').trim();
     const memberCount = Number(state.homeGroupMemberCount || 0);
+    const groupEnabled = state.homeGroupEnabled !== false;
     const message = !groupId
       ? '請先建立或加入活力組。'
-      : '活力組至少需要 2 位成員，才能使用此功能。';
+      : (!groupEnabled
+          ? (state.homeGroupStatusMessage || '此活力組目前已停用。')
+          : '活力組至少需要 2 位成員，才能使用此功能。');
 
-    if (groupId && memberCount >= 2) {
+    if (groupId && groupEnabled && memberCount >= 2) {
       return true;
     }
 
@@ -5957,20 +6582,31 @@ function clearPrayerAutoScroll(selector) {
 
   function persistCurrentPlayer() {
     if (!state.sessionToken) {
-      localStorage.removeItem(STORAGE_KEY);
+      try { localStorage.removeItem(STORAGE_KEY); } catch (ignored) {}
+      try { sessionStorage.removeItem(STORAGE_KEY); } catch (ignored) {}
       return;
     }
 
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        sessionToken: state.sessionToken,
-        savedAt: new Date().toISOString(),
-        playerId: state.currentPlayer && state.currentPlayer.playerId
-          ? state.currentPlayer.playerId
-          : ''
-      })
-    );
+    const record = JSON.stringify({
+      sessionToken: state.sessionToken,
+      savedAt: new Date().toISOString(),
+      playerId: state.currentPlayer && state.currentPlayer.playerId
+        ? state.currentPlayer.playerId
+        : '',
+      persistent: state.keepLogin === true
+    });
+
+    try {
+      if (state.keepLogin === true) {
+        localStorage.setItem(STORAGE_KEY, record);
+        sessionStorage.removeItem(STORAGE_KEY);
+      } else {
+        sessionStorage.setItem(STORAGE_KEY, record);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (error) {
+      throw new Error('無法保存登入狀態，請確認瀏覽器允許本機儲存。');
+    }
   }
 
   function showAuthMessage(message, success) {
@@ -6082,13 +6718,27 @@ function clearPrayerAutoScroll(selector) {
     );
   }
 
-  function handleSessionExpired() {
+  function handleSessionExpired(requestContext) {
+    requestContext = requestContext || {};
+
+    if (!requestContext.sessionToken) {
+      return;
+    }
+
+    if (
+      requestContext.sessionToken !== state.sessionToken ||
+      Number(requestContext.sessionGeneration) !== Number(state.sessionGeneration)
+    ) {
+      return;
+    }
+
     if (state.sessionInvalidated) {
       return;
     }
 
     state.sessionInvalidated = true;
-    clearCurrentSession();
+    notifyOtherAppInstances_('sessionRevoked');
+    clearCurrentSession({ preserveSessionInvalidated: true });
     showAuth();
     showAuthMessage('登入狀態已失效，請重新登入。');
   }
@@ -6241,77 +6891,53 @@ function clearPrayerAutoScroll(selector) {
     return list;
   }
 
+  function createStaleRequestError_() {
+    const error = new Error('資料狀態已更新，舊請求已忽略');
+    error.code = STALE_REQUEST_ERROR_CODE;
+    error.isStaleRequest = true;
+    return error;
+  }
+
+  function isServerRequestContextCurrent_(requestContext) {
+    requestContext = requestContext || {};
+
+    return (
+      String(requestContext.sessionToken || '') === String(state.sessionToken || '') &&
+      Number(requestContext.sessionGeneration) === Number(state.sessionGeneration)
+    );
+  }
+
   function callServer(functionName, ...args) {
+    const requestContext = {
+      sessionToken: state.sessionToken,
+      sessionGeneration: state.sessionGeneration
+    };
     const finalArgs = prepareServerCallArgs(functionName, args);
     const isMutation = SERVER_MUTATION_APIS.has(functionName);
-    const isCombinedAuthMutation = SERVER_AUTH_COMBINED_APIS.has(functionName);
-    const now = () => (
-      window.performance && typeof window.performance.now === 'function'
-        ? window.performance.now()
-        : Date.now()
-    );
-    const requestStartedAt = now();
-    let performanceLogged = false;
-
-    const logPerformance = (success, error, code) => {
-      if (performanceLogged) {
-        return;
-      }
-
-      performanceLogged = true;
-      const details = {
-        apiName: functionName,
-        elapsedMs: Math.max(0, Math.round(now() - requestStartedAt)),
-        success: !!success
-      };
-
-      if (!success) {
-        details.code = String(code || '');
-        details.error = String(error || '系統錯誤');
-        console.error('[API]', details);
-        return;
-      }
-
-      console.info('[API]', details);
-    };
 
     return new Promise((resolve, reject) => {
       let settled = false;
-      // GAS Web App 請求無法取消已開始的後端執行。一般寫入型 API
-      // 仍等待正式 callback；登入／註冊使用單一、有限的等待上限。
-      // 逾時後不重送、不查快取、不輪詢，改由使用者以帳密直接登入確認。
-      const timeoutMs = isCombinedAuthMutation
-        ? SERVER_AUTH_CALL_TIMEOUT_MS
-        : (isMutation ? 0 : SERVER_READ_CALL_TIMEOUT_MS);
-      const slowWarningId = isCombinedAuthMutation
-        ? window.setTimeout(() => {
-          if (settled) return;
-          const loadingText = $('#loadingText');
-          if (loadingText) {
-            loadingText.textContent = functionName === 'registerPlayerWithDashboard'
-              ? '註冊仍在處理，請勿重複送出或關閉頁面…'
-              : '登入仍在處理，請勿重複送出或關閉頁面…';
-          }
-        }, SERVER_AUTH_SLOW_WARNING_MS)
-        : 0;
-      const timeoutId = timeoutMs > 0 ? window.setTimeout(() => {
-        if (settled) return;
-        settled = true;
-        const error = new Error(
-          isCombinedAuthMutation
-            ? '伺服器處理時間過長，結果無法確認'
-            : '伺服器回應逾時，請確認網路後再試一次'
-        );
-        error.code = isCombinedAuthMutation
-          ? 'AUTH_RESPONSE_TIMEOUT'
-          : 'CLIENT_TIMEOUT';
-        logPerformance(false, error.message, error.code);
-        reject(error);
-      }, timeoutMs) : 0;
+      // 讀取與共用傳輸層使用相同等待期限；寫入交由共用傳輸層統一終止等待。
+      // 具 requestId 的寫入重試會沿用原 requestId，避免重複建立資料。
+      const timeoutId = isMutation ? 0 : window.setTimeout(() => {
+        if (settled) {
+          return;
+        }
 
-      const clearCallTimers = () => {
-        if (slowWarningId) window.clearTimeout(slowWarningId);
-        if (timeoutId) window.clearTimeout(timeoutId);
+        settled = true;
+
+        if (!isServerRequestContextCurrent_(requestContext)) {
+          reject(createStaleRequestError_());
+          return;
+        }
+
+        reject(new Error('伺服器回應逾時，請確認網路後再試一次'));
+      }, SERVER_READ_CALL_TIMEOUT_MS);
+
+      const clearCallTimeout = () => {
+        if (timeoutId) {
+          window.clearTimeout(timeoutId);
+        }
       };
 
       const resolveOnce = (res) => {
@@ -6320,17 +6946,17 @@ function clearPrayerAutoScroll(selector) {
         }
 
         settled = true;
-        clearCallTimers();
+        clearCallTimeout();
 
-        if (isSessionErrorResponse(res)) {
-          handleSessionExpired();
+        if (!isServerRequestContextCurrent_(requestContext)) {
+          reject(createStaleRequestError_());
+          return;
         }
 
-        logPerformance(
-          isSuccess(res),
-          res && res.error,
-          res && res.code
-        );
+        if (isSessionErrorResponse(res)) {
+          handleSessionExpired(requestContext);
+        }
+
         resolve(res);
       };
 
@@ -6340,12 +6966,13 @@ function clearPrayerAutoScroll(selector) {
         }
 
         settled = true;
-        clearCallTimers();
-        logPerformance(
-          false,
-          error && error.message ? error.message : String(error || ''),
-          'NETWORK_ERROR'
-        );
+        clearCallTimeout();
+
+        if (!isServerRequestContextCurrent_(requestContext)) {
+          reject(createStaleRequestError_());
+          return;
+        }
+
         reject(error);
       };
 
@@ -6375,11 +7002,25 @@ function clearPrayerAutoScroll(selector) {
 
   function getCacheScope_() {
     return {
+      sessionGeneration: Number(state.sessionGeneration),
       playerId: state.currentPlayer && state.currentPlayer.playerId
         ? String(state.currentPlayer.playerId)
         : '',
-      cycleId: String(state.currentCycleId || '')
+      cycleId: String(state.currentCycleId || ''),
+      businessDate: getTaipeiBusinessDate_()
     };
+  }
+
+  function isCacheScopeCurrent_(scope) {
+    scope = scope || {};
+    const currentScope = getCacheScope_();
+
+    return (
+      Number(scope.sessionGeneration) === Number(currentScope.sessionGeneration) &&
+      String(scope.playerId || '') === currentScope.playerId &&
+      String(scope.cycleId || '') === currentScope.cycleId &&
+      String(scope.businessDate || '') === currentScope.businessDate
+    );
   }
 
   function getCacheEntry_(key) {
@@ -6400,18 +7041,10 @@ function clearPrayerAutoScroll(selector) {
     const scope = getCacheScope_();
 
     if (
+      Number(entry.sessionGeneration) !== Number(scope.sessionGeneration) ||
       String(entry.playerId || '') !== scope.playerId ||
-      String(entry.cycleId || '') !== scope.cycleId
-    ) {
-      delete state.cache[key];
-      return null;
-    }
-
-    const currentBusinessDate = getTaipeiBusinessDate_();
-
-    if (
-      String(entry.businessDate || '') !==
-      currentBusinessDate
+      String(entry.cycleId || '') !== scope.cycleId ||
+      String(entry.businessDate || '') !== scope.businessDate
     ) {
       delete state.cache[key];
       return null;
@@ -6419,9 +7052,8 @@ function clearPrayerAutoScroll(selector) {
 
     if (entry.loadingPromise) {
       if (
-        Date.now() -
-        Number(entry.loadedAt || 0) <=
-        30000
+        Date.now() - Number(entry.loadedAt || 0) <=
+        CACHE_LOADING_PROMISE_TTL_MS
       ) {
         return entry;
       }
@@ -6458,14 +7090,14 @@ function clearPrayerAutoScroll(selector) {
     return entry && entry.valid ? entry.data : null;
   }
 
-  function setCache_(key, data) {
+  function writeCacheEntry_(key, data, scope) {
     key = String(key || '').trim();
 
     if (!key) {
       return data;
     }
 
-    const scope = getCacheScope_();
+    scope = scope || getCacheScope_();
     const loadedAt = Date.now();
     const ttlMs = getCacheTtlMs_(key);
 
@@ -6476,12 +7108,18 @@ function clearPrayerAutoScroll(selector) {
       loadedAt: loadedAt,
       expiresAt: loadedAt + ttlMs,
       loadingPromise: null,
-      playerId: scope.playerId,
-      cycleId: scope.cycleId,
-      businessDate: getTaipeiBusinessDate_()
+      requestId: 0,
+      sessionGeneration: Number(scope.sessionGeneration),
+      playerId: String(scope.playerId || ''),
+      cycleId: String(scope.cycleId || ''),
+      businessDate: String(scope.businessDate || '')
     };
 
     return data;
+  }
+
+  function setCache_(key, data) {
+    return writeCacheEntry_(key, data, getCacheScope_());
   }
 
   function invalidateCache_(key) {
@@ -6500,7 +7138,35 @@ function clearPrayerAutoScroll(selector) {
     state.cache = {};
   }
 
+  function isApiResponseEnvelope_(value) {
+    return !!(
+      value &&
+      typeof value === 'object' &&
+      Object.prototype.hasOwnProperty.call(value, 'success')
+    );
+  }
+
+  function isCacheRequestCurrent_(key, requestId, scope) {
+    const entry = state.cache && state.cache[key];
+
+    return !!(
+      entry &&
+      entry.loadingPromise &&
+      Number(entry.requestId) === Number(requestId) &&
+      isCacheScopeCurrent_(scope)
+    );
+  }
+
+  function clearCacheRequestIfCurrent_(key, requestId) {
+    const entry = state.cache && state.cache[key];
+
+    if (entry && Number(entry.requestId) === Number(requestId)) {
+      delete state.cache[key];
+    }
+  }
+
   function loadOnce_(key, loader) {
+    key = String(key || '').trim();
     const cached = getCacheEntry_(key);
 
     if (cached && cached.valid) {
@@ -6512,11 +7178,25 @@ function clearPrayerAutoScroll(selector) {
     }
 
     const scope = getCacheScope_();
-    const promise = Promise.resolve()
+    const requestId = ++state.cacheRequestSequence;
+    let promise = null;
+
+    promise = Promise.resolve()
       .then(loader)
-      .then((data) => setCache_(key, data))
+      .then((data) => {
+        if (!isCacheRequestCurrent_(key, requestId, scope)) {
+          throw createStaleRequestError_();
+        }
+
+        if (isApiResponseEnvelope_(data) && !isSuccess(data)) {
+          clearCacheRequestIfCurrent_(key, requestId);
+          return data;
+        }
+
+        return writeCacheEntry_(key, data, scope);
+      })
       .catch((error) => {
-        invalidateCache_(key);
+        clearCacheRequestIfCurrent_(key, requestId);
         throw error;
       });
 
@@ -6527,9 +7207,11 @@ function clearPrayerAutoScroll(selector) {
       loadedAt: Date.now(),
       expiresAt: 0,
       loadingPromise: promise,
+      requestId: requestId,
+      sessionGeneration: Number(scope.sessionGeneration),
       playerId: scope.playerId,
       cycleId: scope.cycleId,
-      businessDate: getTaipeiBusinessDate_()
+      businessDate: scope.businessDate
     };
 
     return promise;
@@ -6725,7 +7407,7 @@ function clearPrayerAutoScroll(selector) {
 
     const padded = String(number).padStart(3, '0');
 
-    return ASSET_BASE_URL +
+    return REMOTE_AVATAR_BASE_URL +
       (
         normalized === 'female'
           ? '/avatar-female/avatar-female-direct-'

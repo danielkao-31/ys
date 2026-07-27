@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/png" href="../UI/app-icon.png">
   <link rel="apple-touch-icon" href="../UI/app-icon.png">
-  <link rel="manifest" href="manifest.webmanifest?v=20260725-v01322-stable-fix3">
+  <link rel="manifest" href="manifest.webmanifest?v=20260727-v01321-fix12-rc4">
 <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,13 +13,13 @@
   <meta name="application-name" content="高雄青職｜活力同行">
   <meta name="theme-color" content="#8fd3ff">
   <title>高雄青職｜活力同行</title>
-  <link rel="stylesheet" href="admin.css?v=20260725-v01322-stable-fix3">
+  <link rel="stylesheet" href="admin.css?v=20260727-v01321-fix12-rc4">
 </head>
 <body>
   <main class="shell">
     <header class="topbar">
       <div class="brand"><small>高雄青職｜活力同行</small><h1>管理者後台</h1><p>管理活力人、活力組、代禱事項、活動紀錄、積分紀錄與系統設定。</p></div>
-      <div class="toolbar"><button id="openAppBtn" class="btn" type="button">開啟前台</button><button id="logoutBtn" class="btn red hidden" type="button">登出後台</button></div>
+      <div class="toolbar"><button id="logoutBtn" class="btn red hidden" type="button">登出後台</button></div>
     </header>
 
     <section id="loginView" class="panel login-card">
@@ -41,6 +41,7 @@
         <button class="tab-btn active" data-tab="overview" type="button">總覽</button>
         <button class="tab-btn" data-tab="players" type="button">活力人</button>
         <button class="tab-btn" data-tab="groups" type="button">活力組</button>
+        <button class="tab-btn" data-tab="groupPosts" type="button">小組公告</button>
         <button class="tab-btn" data-tab="cycles" type="button">週目</button>
         <button class="tab-btn" data-tab="prayers" type="button">代禱</button>
         <button class="tab-btn" data-tab="activityLogs" type="button">活動紀錄</button>
@@ -86,6 +87,19 @@
           <div id="groupsMessage" class="message"></div>
         </section>
 
+
+
+        <section id="groupPostsTab" class="panel section hidden">
+          <div class="section-head"><div><h2>小組公告管理</h2><p>查看各活力組公告，必要時由管理者移除。</p></div><button class="btn primary" data-refresh="groupPosts" type="button">更新小組公告</button></div>
+          <div class="toolbar">
+            <input id="groupPostSearch" class="search-input" type="search" placeholder="搜尋活力組、發布者、公告內容">
+            <select id="groupPostStatusFilter"><option value="active">只看顯示中</option><option value="all">全部狀態</option><option value="deleted">已移除</option></select>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>活力組</th><th>發布者</th><th>公告內容</th><th>狀態</th><th>時間</th><th>操作</th></tr></thead><tbody id="groupPostsBody"></tbody></table></div>
+          <div class="module-toolbar"><button id="loadMoreGroupPostsBtn" class="btn hidden" type="button">載入較舊公告</button></div>
+          <div id="groupPostsMessage" class="message"></div>
+        </section>
+
         <section id="cyclesTab" class="panel section hidden">
           <div class="section-head"><div><h2>週目管理</h2><p>週目由活力人完成旅程後自行進入；後台僅檢視各活力人的目前週目與資料狀態。</p></div><button class="btn primary" data-refresh="cycles" type="button">更新週目</button></div>
           <div id="cyclesCurrent" class="metrics"></div>
@@ -100,22 +114,24 @@
           <div class="section-head"><div><h2>代禱管理</h2><p>檢視內容、恢復或關閉代禱事項。</p></div><button class="btn primary" data-refresh="prayers" type="button">更新代禱</button></div>
           <div class="toolbar"><input id="prayerSearch" class="search-input" type="search" placeholder="搜尋標題、內容、發起者"><select id="prayerStatusFilter"><option value="all">全部狀態</option><option value="open">open</option><option value="closed">closed</option></select></div>
           <div class="table-wrap"><table><thead><tr><th>代禱事項</th><th>發起者</th><th>活力組</th><th>狀態</th><th>可見</th><th>互動</th><th>時間</th><th>操作</th></tr></thead><tbody id="prayersBody"></tbody></table></div>
+          <div class="pagination-actions"><button id="loadMorePrayersBtn" class="btn" type="button">載入更多</button></div>
           <div id="prayersMessage" class="message"></div>
         </section>
 
         <section id="activityLogsTab" class="panel section hidden">
-          <div class="section-head"><div><h2>活動紀錄</h2><p>查看管理者在系統中的操作紀錄。</p></div><button class="btn primary" data-refresh="activityLogs" type="button">更新活動紀錄</button></div>
+          <div class="section-head"><div><h2>活動紀錄</h2><p>每次讀取最新 100 筆，較舊資料按需載入；統計只計目前最新頁。</p></div><button class="btn primary" data-refresh="activityLogs" type="button">更新活動紀錄</button></div>
           <div id="activityAnalysis" class="metrics"></div>
           <div class="split">
             <section><h3>常見操作</h3><div id="activityTopActions" class="mini-list"></div></section>
             <section><h3>常見目標</h3><div id="activityTopTargets" class="mini-list"></div></section>
           </div>
           <div class="table-wrap"><table><thead><tr><th>動作</th><th>目標</th><th>內容</th><th>時間</th></tr></thead><tbody id="adminLogsBody"></tbody></table></div>
+          <div class="module-toolbar"><button id="loadMoreAdminLogsBtn" class="btn hidden" type="button">載入較舊紀錄</button></div>
           <div id="activityLogsMessage" class="message"></div>
         </section>
 
         <section id="rewardLogsTab" class="panel section hidden">
-          <div class="section-head"><div><h2>積分紀錄</h2><p>查看活力人的積分與活力組旅程分數變動紀錄。</p></div><button class="btn primary" data-refresh="rewardLogs" type="button">更新積分紀錄</button></div>
+          <div class="section-head"><div><h2>積分紀錄</h2><p>每次讀取最新 100 筆，較舊資料按需載入；統計只計目前最新頁。</p></div><button class="btn primary" data-refresh="rewardLogs" type="button">更新積分紀錄</button></div>
           <div id="rewardAnalysis" class="metrics"></div>
           <div class="split">
             <section><h3>活力人熱度</h3><div id="rewardTopPlayers" class="mini-list"></div></section>
@@ -126,18 +142,31 @@
             <section><h3>近況趨勢</h3><div id="rewardDailyTrend" class="mini-list"></div></section>
           </div>
           <div class="table-wrap"><table><thead><tr><th>活力人</th><th>來源</th><th>分數</th><th>時間</th></tr></thead><tbody id="rewardLogsBody"></tbody></table></div>
+          <div class="module-toolbar"><button id="loadMoreRewardLogsBtn" class="btn hidden" type="button">載入較舊紀錄</button></div>
           <div id="rewardLogsMessage" class="message"></div>
         </section>
 
         <section id="chestsTab" class="panel section hidden">
           <div class="section-head"><div><h2>寶箱設定</h2><p>設定週目寶箱名稱、獎勵方式、獎勵說明與小組點數。</p></div><button class="btn primary" data-refresh="chests" type="button">更新寶箱</button></div>
           <div id="chestsList" class="settings-grid"></div>
+          <div class="module-subsection">
+            <div class="section-head"><div><h3>其他獎勵發放</h3><p>發放紀錄獨立分頁載入，預設只讀取待發放項目。</p></div></div>
+            <div class="toolbar">
+              <select id="chestRewardClaimFilter"><option value="PENDING">待發放</option><option value="ALL">全部紀錄</option><option value="FULFILLED">已發放</option><option value="UNCLAIMED">尚未申請</option></select>
+              <button id="refreshChestClaimsBtn" class="btn" type="button">更新發放紀錄</button>
+            </div>
+            <div class="table-wrap module-table-wrap"><table>
+              <thead><tr><th>活力人</th><th>寶箱／獎勵</th><th>取得時間</th><th>狀態</th><th>處理</th></tr></thead>
+              <tbody id="chestRewardClaimsBody"></tbody>
+            </table></div>
+            <div class="module-toolbar"><button id="loadMoreChestClaimsBtn" class="btn hidden" type="button">載入較舊紀錄</button></div>
+          </div>
           <div id="chestsMessage" class="message"></div>
         </section>
 
         <section id="systemAnnouncementsTab" class="panel section hidden">
           <div class="section-head">
-            <div><h2>系統公告</h2><p>管理所有使用者都會收到的系統公告；與活力組公告分開儲存。</p></div>
+            <div><h2>系統公告</h2><p>管理所有使用者都會收到的系統公告；與小組公告分開儲存。</p></div>
             <div class="toolbar">
               <button id="newSystemAnnouncementBtn" class="btn green" type="button">新增公告</button>
               <button class="btn primary" data-refresh="systemAnnouncements" type="button">更新公告</button>
@@ -197,7 +226,7 @@
 
           <div class="table-wrap module-table-wrap">
             <table>
-              <thead><tr><th>任務</th><th>獎勵</th><th>顯示期間</th><th>狀態</th><th>完成／資格／已發</th><th>版本</th><th>最後修改</th><th>操作</th></tr></thead>
+              <thead><tr><th>任務</th><th>獎勵</th><th>顯示期間</th><th>狀態</th><th>完成／資格／獎勵處理</th><th>版本</th><th>最後修改</th><th>操作</th></tr></thead>
               <tbody id="specialTasksBody"></tbody>
             </table>
           </div>
@@ -238,7 +267,7 @@
               <div id="specialTaskResultStats" class="module-stats"></div>
               <div id="specialTaskGroupStatsWrap" class="table-wrap module-table-wrap">
                 <table>
-                  <thead><tr><th>活力組</th><th>完成者</th><th>符合資格</th><th>已發送</th><th>失敗</th></tr></thead>
+                  <thead><tr><th>活力組</th><th>完成者</th><th>符合資格</th><th>獎勵處理</th><th>失敗</th></tr></thead>
                   <tbody id="specialTaskGroupStatsBody"></tbody>
                 </table>
               </div>
@@ -262,6 +291,25 @@
               <p>背景準備期間玩家可正常使用；只有按下「開始最後切換」後，才會短暫暫停登入與資料寫入。背景自動處理最多 60 分鐘，最後切換最多 10 分鐘。</p>
             </div>
             <button class="btn primary" data-refresh="migration" type="button">更新狀態</button>
+          </div>
+          <div class="module-subsection">
+            <div class="section-head">
+              <div>
+                <h3>本版安全資料整理</h3>
+                <p>先預覽影響範圍；正式執行前自動備份，並以分批方式處理。一般使用者不會觸發此流程。</p>
+              </div>
+              <div class="toolbar">
+                <button id="previewFix12DataRepairsBtn" class="btn" type="button">預覽影響範圍</button>
+                <button id="runFix12DataRepairBatchBtn" class="btn amber" type="button">執行下一批</button>
+              </div>
+            </div>
+            <div class="migration-status-grid">
+              <article class="mini-item"><small>整理狀態</small><strong id="fix12OverallRepairStatus">讀取中</strong></article>
+              <article class="mini-item"><small>小組公告整理</small><strong id="fix12GroupPostsRepairStatus">讀取中</strong></article>
+              <article class="mini-item"><small>共同任務足跡回填</small><strong id="fix12GroupTasksRepairStatus">讀取中</strong></article>
+              <article class="mini-item"><small>備份與進度</small><strong id="fix12BackupProgressStatus">讀取中</strong></article>
+            </div>
+            <div id="fix12DataRepairsMessage" class="message"></div>
           </div>
           <div id="v0131MaintenanceStatusGrid" class="migration-status-grid">
             <article class="mini-item"><small>玩家使用狀態</small><strong id="migrationPlayerAccess">讀取中</strong></article>
@@ -359,8 +407,8 @@
   </main>
 
   <div id="loading" class="loading hidden"><div class="loading-card"><div class="spinner"></div><span id="loadingText">處理中...</span></div></div>
-  <script src="runtime-settings.js?v=20260725-v01322-stable-fix3"></script>
-  <script src="server-client.js?v=20260725-v01322-stable-fix3"></script>
-  <script src="admin.js?v=20260725-v01322-stable-fix3"></script>
+  <script src="runtime-settings.js?v=20260727-v01321-fix12-rc4"></script>
+  <script src="server-client.js?v=20260727-v01321-fix12-rc4"></script>
+  <script src="admin.js?v=20260727-v01321-fix12-rc4"></script>
 </body>
 </html>

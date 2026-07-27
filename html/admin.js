@@ -1,7 +1,29 @@
 const ADMIN_STORAGE_KEY = 'yct_admin_token';
-    const state = {token:'',tab:'overview',players:[],groups:[],cycles:[],playerCycles:[],cycleMemberships:[],cycleGroups:[],currentCycle:null,prayers:[],adminLogs:[],rewardLogs:[],activityAnalysis:null,rewardAnalysis:null,chests:[],systemAnnouncements:[],specialTasks:[],selectedSpecialTaskId:'',specialTaskResults:null,specialTaskCsvText:'',specialTaskCsvPreview:null,migration:null,archiveMaintenance:null,settings:[],settingsHealth:null};
+    const state = {token:'',tab:'overview',loadingDepth:0,players:[],groups:[],groupPosts:[],groupPostNextPageToken:'',groupPostHasMore:false,cycles:[],playerCycles:[],cycleMemberships:[],cycleGroups:[],currentCycle:null,prayers:[],prayerNextPageToken:'',prayerHasMore:false,adminLogs:[],rewardLogs:[],adminLogNextPageToken:'',rewardLogNextPageToken:'',groupRewardLogNextPageToken:'',adminLogHasMore:false,rewardLogHasMore:false,groupRewardLogHasMore:false,activityAnalysis:null,rewardAnalysis:null,chests:[],chestClaims:[],chestClaimNextPageToken:'',chestClaimHasMore:false,systemAnnouncements:[],specialTasks:[],selectedSpecialTaskId:'',specialTaskResults:null,specialTaskCsvText:'',specialTaskCsvPreview:null,migration:null,fix12Repairs:null,archiveMaintenance:null,settings:[],settingsHealth:null};
     const $ = (s) => document.querySelector(s);
     const $$ = (s) => [...document.querySelectorAll(s)];
+    const USER_APP_SYNC_SIGNAL_KEY = 'yct_app_sync_signal';
+    const USER_APP_SYNC_CHANNEL_NAME = 'yct_app_sync_v1';
+
+    function notifyUserAppInstances_(reason){
+      const payload = {
+        playerId:'',
+        reason:String(reason || 'adminDataChanged'),
+        timestamp:Date.now()
+      };
+
+      if('BroadcastChannel' in window){
+        try{
+          const channel = new BroadcastChannel(USER_APP_SYNC_CHANNEL_NAME);
+          channel.postMessage(payload);
+          channel.close();
+        }catch(error){}
+      }
+
+      try{
+        localStorage.setItem(USER_APP_SYNC_SIGNAL_KEY,JSON.stringify(payload));
+      }catch(error){}
+    }
 
     document.addEventListener('DOMContentLoaded', () => { initializeAdminLoginFieldProtection_(); bindEvents(); restoreSession(); });
 
@@ -42,7 +64,6 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
     }
 
     function bindEvents(){
-      $('#openAppBtn').addEventListener('click', openFrontend);
       $('#loginBtn').addEventListener('click', login);
       $('#adminPasswordInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') login(); });
       $('#logoutBtn').addEventListener('click', () => logout());
@@ -53,13 +74,24 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       $('#playerStatusFilter').addEventListener('change', renderPlayers);
       $('#groupSearch').addEventListener('input', renderGroups);
       $('#groupStatusFilter').addEventListener('change', renderGroups);
+      $('#groupPostSearch').addEventListener('input', renderGroupPosts);
+      $('#groupPostStatusFilter').addEventListener('change', () => loadGroupPosts(true));
+      $('#loadMoreGroupPostsBtn').addEventListener('click', loadMoreGroupPosts);
       $('#prayerSearch').addEventListener('input', renderPrayers);
-      $('#prayerStatusFilter').addEventListener('change', renderPrayers);
+      $('#prayerStatusFilter').addEventListener('change', () => loadPrayers(true));
+      $('#loadMorePrayersBtn').addEventListener('click', () => loadPrayers(false));
+      $('#loadMoreAdminLogsBtn').addEventListener('click', loadMoreAdminLogs);
+      $('#loadMoreRewardLogsBtn').addEventListener('click', loadMoreRewardLogs);
       $('#playersBody').addEventListener('click', handlePlayerAction);
       $('#groupsBody').addEventListener('click', handleGroupAction);
+      $('#groupPostsBody').addEventListener('click', handleGroupPostAction);
       $('#prayersBody').addEventListener('click', handlePrayerAction);
       $('#chestsList').addEventListener('click', handleChestAction);
       $('#chestsList').addEventListener('change', handleChestRewardTypeChange);
+      $('#chestRewardClaimsBody').addEventListener('click', handleChestRewardClaimAction);
+      $('#chestRewardClaimFilter').addEventListener('change', () => loadChestRewardClaims(true));
+      $('#refreshChestClaimsBtn').addEventListener('click', () => loadChestRewardClaims(true));
+      $('#loadMoreChestClaimsBtn').addEventListener('click', () => loadChestRewardClaims(false));
       $('#newSystemAnnouncementBtn').addEventListener('click', resetSystemAnnouncementForm);
       $('#cancelSystemAnnouncementEditBtn').addEventListener('click', resetSystemAnnouncementForm);
       $('#systemAnnouncementForm').addEventListener('submit', saveSystemAnnouncement);
@@ -84,6 +116,8 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       $('#viewArchiveManifestBtn').addEventListener('click',viewArchiveManifest);
       $('#resumeFailedArchiveBtn').addEventListener('click',resumeFailedArchiveManifest);
       $('#ensureMaintenanceTriggersBtn').addEventListener('click',() => runArchiveMaintenanceAction('adminEnsureDataMaintenanceTriggers','建立／修復排程'));
+      $('#previewFix12DataRepairsBtn').addEventListener('click',previewFix12DataRepairs);
+      $('#runFix12DataRepairBatchBtn').addEventListener('click',runFix12DataRepairBatch);
       $('#runV0131MigrationBtn').addEventListener('click',() => runV0131MigrationAction('adminRunV0131Migration','開始背景資料準備'));
       $('#resumeV0131MigrationBtn').addEventListener('click',() => runV0131MigrationAction('adminResumeV0131Migration','繼續背景資料準備'));
       $('#pauseV0131MigrationBtn').addEventListener('click',() => runV0131MigrationAction('adminPauseV0131Migration','暫停資料升級'));
@@ -99,7 +133,11 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
     }
 
     function restoreSession(){
-      const token = localStorage.getItem(ADMIN_STORAGE_KEY);
+      let token = '';
+      try{
+        token = sessionStorage.getItem(ADMIN_STORAGE_KEY) || '';
+        localStorage.removeItem(ADMIN_STORAGE_KEY);
+      }catch(ignored){}
       if(!token) return showLogin();
       state.token = token;
       showApp();
@@ -130,7 +168,8 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
 
         state.token = res.data.adminToken || '';
         lockAndClearAdminLoginField_();
-        localStorage.setItem(ADMIN_STORAGE_KEY,state.token);
+        sessionStorage.setItem(ADMIN_STORAGE_KEY,state.token);
+        localStorage.removeItem(ADMIN_STORAGE_KEY);
         showMessage(
           '#loginMessage',
           res.data.mustChangePassword
@@ -144,7 +183,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
           $$('.tab-btn').forEach((b) => {
             b.classList.toggle('active', b.dataset.tab === 'settings');
           });
-          ['overview','players','groups','cycles','prayers','activityLogs','rewardLogs','chests','systemAnnouncements','specialTasks','migration','settings'].forEach((name) => {
+          ['overview','players','groups','groupPosts','cycles','prayers','activityLogs','rewardLogs','chests','systemAnnouncements','specialTasks','migration','settings'].forEach((name) => {
             $('#' + name + 'Tab').classList.toggle('hidden', name !== 'settings');
           });
         } else {
@@ -156,14 +195,12 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
 
     function logout(message){
       state.token = '';
+      state.loadingDepth = 0;
+      sessionStorage.removeItem(ADMIN_STORAGE_KEY);
       localStorage.removeItem(ADMIN_STORAGE_KEY);
+      $('#loading').classList.add('hidden');
       showLogin();
       if(message) showMessage('#loginMessage',message,'error');
-    }
-
-    function openFrontend(){
-      const url = window.location.href.split('?')[0].split('#')[0];
-      window.open(url,'_top');
     }
 
     function switchTab(tab){
@@ -173,7 +210,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         b.classList.toggle('active',b.dataset.tab === tab);
       });
 
-      ['overview','players','groups','cycles','prayers','activityLogs','rewardLogs','chests','systemAnnouncements','specialTasks','migration','settings'].forEach((name) => {
+      ['overview','players','groups','groupPosts','cycles','prayers','activityLogs','rewardLogs','chests','systemAnnouncements','specialTasks','migration','settings'].forEach((name) => {
         $('#' + name + 'Tab').classList.toggle('hidden',name !== tab);
       });
 
@@ -185,6 +222,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         overview:loadOverview,
         players:loadPlayers,
         groups:loadGroups,
+        groupPosts:loadGroupPosts,
         cycles:loadCycles,
         prayers:loadPrayers,
         activityLogs:loadActivityLogs,
@@ -205,15 +243,15 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       Promise.all([
         callServer('adminGetDashboardStats',state.token),
         callServer('adminGetGroups',state.token),
-        callServer('adminGetActivityLogs',state.token,{limit:12})
+        callServer('adminGetActivityLogs',state.token,{limit:12,includeReward:false,includeAnalysis:false})
       ]).then(([statsRes,groupsRes,logsRes]) => {
         if(!isSuccess(statsRes)) throw new Error(responseError(statsRes,'總覽讀取失敗'));
         if(!isSuccess(groupsRes)) throw new Error(responseError(groupsRes,'活力組讀取失敗'));
         if(!isSuccess(logsRes)) throw new Error(responseError(logsRes,'紀錄讀取失敗'));
 
         const stats = statsRes.data || {};
+        const recentAdminLogs = logsRes.data.adminLogs || [];
         state.groups = groupsRes.data.groups || [];
-        state.adminLogs = logsRes.data.adminLogs || [];
 
         $('#metricPlayers').textContent = number(stats.playersTotal);
         $('#metricSocialYoungPlayers').textContent = number(stats.socialYoungPlayers);
@@ -225,7 +263,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
           '｜未設定出生年 ' + number(stats.unsetAgePlayers) +
           '｜代禱開放中 ' + number(stats.openPrayerRequests);
 
-        renderMiniList('#recentAdminLogs',state.adminLogs,(r) => ({
+        renderMiniList('#recentAdminLogs',recentAdminLogs,(r) => ({
           title:r.adminAction + '｜' + r.targetType,
           note:r.detail || r.targetId || '',
           time:r.createdAt || ''
@@ -323,6 +361,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         if(!isSuccess(res)) return showMessage('#playersMessage',responseError(res,'更新失敗'),'error');
 
         state.players = [];
+        state.groups = [];
         loadPlayers(true);
       }).catch((err) => showMessage('#playersMessage',errorMessage(err),'error'))
         .finally(() => setLoading(false));
@@ -387,13 +426,15 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         return '<tr>' +
           '<td><div class="cell-main"><strong>' + esc(g.groupName) + '</strong><small>' + esc(g.groupId) + '</small></div></td>' +
           '<td>' + esc(g.ownerPlayerName || '-') + '</td>' +
-          '<td><span class="pill">' + esc(g.inviteCode || '-') + '</span></td>' +
+          '<td><span class="pill">' + esc(g.enabled ? (g.inviteCode || '-') : '-') + '</span></td>' +
           '<td>' + number(g.memberCount) + '</td>' +
           '<td>旅程 ' + number(g.journeyScore) + '<br><small>活力人合計 ' + number(g.playerScoreTotal) + '</small></td>' +
           '<td><span class="pill ' + (g.enabled ? 'enabled' : 'disabled') + '">' + (g.enabled ? '啟用' : '停用') + '</span></td>' +
           '<td><div class="row-actions">' +
             '<button class="btn small ' + (g.enabled ? 'red' : 'green') + '" data-action="group-enabled" data-group-id="' + esc(g.groupId) + '" data-enabled="' + (!g.enabled) + '">' + (g.enabled ? '停用' : '啟用') + '</button>' +
-            '<button class="btn small amber" data-action="group-invite" data-group-id="' + esc(g.groupId) + '">重發邀請碼</button>' +
+            (g.enabled
+              ? '<button class="btn small amber" data-action="group-invite" data-group-id="' + esc(g.groupId) + '">重發邀請碼</button>'
+              : '') +
           '</div></td>' +
         '</tr>';
       }).join('') : '<tr><td colspan="7">沒有符合條件的活力組</td></tr>';
@@ -419,6 +460,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       callServer('adminUpdateGroupEnabled',state.token,{groupId,enabled}).then((res) => {
         if(!isSuccess(res)) return showMessage('#groupsMessage',responseError(res,'更新失敗'),'error');
 
+        notifyUserAppInstances_('groupEnabledChanged');
         state.groups = [];
         loadGroups(true);
       }).catch((err) => showMessage('#groupsMessage',errorMessage(err),'error'))
@@ -440,15 +482,34 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
     }
 
     function loadPrayers(force){
-      if(state.prayers.length && !force) return renderPrayers();
+      if(state.prayers.length && !force && !state.prayerHasMore) return renderPrayers();
+
+      if(force){
+        state.prayers = [];
+        state.prayerNextPageToken = '';
+        state.prayerHasMore = false;
+      }
 
       setLoading(true,'讀取代禱...');
-      callServer('adminGetPrayerRequests',state.token).then((res) => {
+      callServer('adminGetPrayerRequests',state.token,{
+        pageToken: state.prayerNextPageToken,
+        pageSize: 100,
+        status: $('#prayerStatusFilter').value
+      }).then((res) => {
         if(!isSuccess(res)) return showMessage('#prayersMessage',responseError(res,'讀取代禱失敗'),'error');
 
-        state.prayers = res.data.requests || [];
+        const rows = res.data.requests || [];
+        state.prayers = force ? rows : state.prayers.concat(rows);
+        state.prayerNextPageToken = String(res.data.nextPageToken || '');
+        state.prayerHasMore = !!res.data.hasMore;
+        $('#loadMorePrayersBtn').classList.toggle('hidden',!state.prayerHasMore);
         renderPrayers();
-        showMessage('#prayersMessage','已讀取 ' + state.prayers.length + ' 筆代禱事項','success');
+        showMessage(
+          '#prayersMessage',
+          '已讀取 ' + state.prayers.length + ' 筆代禱事項' +
+            (state.prayerHasMore ? '，尚有下一頁' : ''),
+          'success'
+        );
       }).catch((err) => showMessage('#prayersMessage',errorMessage(err),'error'))
         .finally(() => setLoading(false));
     }
@@ -477,7 +538,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
           '<td>' + esc(r.groupName || '-') + '</td>' +
           '<td><span class="pill ' + esc(r.status) + '">' + esc(r.status) + '</span></td>' +
           '<td>' + esc(r.visibility || '-') + '</td>' +
-          '<td>回應 ' + number(r.responseCount) + '<br>代禱 ' + number(r.prayedCount) + '</td>' +
+          '<td>已代禱 ' + number(r.responseCount) + ' 人</td>' +
           '<td>' + esc(r.createdAt || '-') + '</td>' +
           '<td><div class="row-actions">' +
             prayerButton(r,'open','恢復') +
@@ -507,29 +568,41 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         if(!isSuccess(res)) return showMessage('#prayersMessage',responseError(res,'更新失敗'),'error');
 
         state.prayers = [];
+        state.prayerNextPageToken = '';
+        state.prayerHasMore = false;
         loadPrayers(true);
       }).catch((err) => showMessage('#prayersMessage',errorMessage(err),'error'))
         .finally(() => setLoading(false));
     }
 
-    function loadActivityLogs(){
-      loadLogRecords('#activityLogsMessage','讀取活動紀錄...','活動紀錄已更新');
+    function loadActivityLogs(force){
+      if(state.adminLogs.length && !force) return renderActivityLogs();
+      loadLogRecords(true,'#activityLogsMessage','讀取活動紀錄...','活動紀錄已更新');
     }
 
-    function loadRewardLogs(){
-      loadLogRecords('#rewardLogsMessage','讀取積分紀錄...','積分紀錄已更新');
+    function loadRewardLogs(force){
+      if(state.rewardLogs.length && !force) return renderRewardLogs();
+      loadLogRecords(true,'#rewardLogsMessage','讀取積分紀錄...','積分紀錄已更新');
     }
 
-    function loadLogRecords(messageSelector,loadingText,successText){
+    function loadLogRecords(includeAnalysis,messageSelector,loadingText,successText){
       setLoading(true,loadingText);
 
-      callServer('adminGetActivityLogs',state.token,{limit:100}).then((res) => {
+      callServer('adminGetActivityLogs',state.token,{limit:100,includeAnalysis:!!includeAnalysis}).then((res) => {
         if(!isSuccess(res)) return showMessage(messageSelector,responseError(res,'讀取紀錄失敗'),'error');
 
-        state.adminLogs = res.data.adminLogs || [];
-        state.rewardLogs = res.data.rewardLogs || [];
-        state.activityAnalysis = res.data.activityAnalysis || null;
-        state.rewardAnalysis = res.data.rewardAnalysis || null;
+        const data = res.data || {};
+        const pagination = data.pagination || {};
+        state.adminLogs = data.adminLogs || [];
+        state.rewardLogs = data.rewardLogs || [];
+        state.adminLogNextPageToken = pagination.adminNextPageToken || '';
+        state.rewardLogNextPageToken = pagination.rewardNextPageToken || '';
+        state.groupRewardLogNextPageToken = pagination.groupRewardNextPageToken || '';
+        state.adminLogHasMore = !!pagination.adminHasMore;
+        state.rewardLogHasMore = !!pagination.rewardHasMore;
+        state.groupRewardLogHasMore = !!pagination.groupRewardHasMore;
+        state.activityAnalysis = data.activityAnalysis || null;
+        state.rewardAnalysis = data.rewardAnalysis || null;
 
         renderActivityLogs();
         renderRewardLogs();
@@ -538,12 +611,77 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         .finally(() => setLoading(false));
     }
 
+    function loadMoreAdminLogs(){
+      if(!state.adminLogHasMore || !state.adminLogNextPageToken) return;
+      const button = $('#loadMoreAdminLogsBtn');
+      button.disabled = true;
+      callServer('adminGetActivityLogs',state.token,{
+        limit:100,
+        includeAdmin:true,
+        includeReward:false,
+        includeAnalysis:false,
+        adminPageToken:state.adminLogNextPageToken
+      }).then((res) => {
+        if(!isSuccess(res)) return showMessage('#activityLogsMessage',responseError(res,'載入較舊紀錄失敗'),'error');
+        const data = res.data || {};
+        const pagination = data.pagination || {};
+        state.adminLogs = appendUniqueRows_(state.adminLogs,data.adminLogs || [],'adminLogId');
+        state.adminLogNextPageToken = pagination.adminNextPageToken || '';
+        state.adminLogHasMore = !!pagination.adminHasMore;
+        renderActivityLogs();
+      }).catch((err) => showMessage('#activityLogsMessage',errorMessage(err),'error'))
+        .finally(() => { button.disabled = false; });
+    }
+
+    function loadMoreRewardLogs(){
+      const hasPlayerMore = state.rewardLogHasMore && state.rewardLogNextPageToken;
+      const hasGroupMore = state.groupRewardLogHasMore && state.groupRewardLogNextPageToken;
+      if(!hasPlayerMore && !hasGroupMore) return;
+
+      const button = $('#loadMoreRewardLogsBtn');
+      button.disabled = true;
+      callServer('adminGetActivityLogs',state.token,{
+        limit:100,
+        includeAdmin:false,
+        includeReward:true,
+        includePlayerReward:!!hasPlayerMore,
+        includeGroupReward:!!hasGroupMore,
+        includeAnalysis:false,
+        rewardPageToken:hasPlayerMore ? state.rewardLogNextPageToken : '',
+        groupRewardPageToken:hasGroupMore ? state.groupRewardLogNextPageToken : ''
+      }).then((res) => {
+        if(!isSuccess(res)) return showMessage('#rewardLogsMessage',responseError(res,'載入較舊紀錄失敗'),'error');
+        const data = res.data || {};
+        const pagination = data.pagination || {};
+        state.rewardLogs = appendUniqueRows_(state.rewardLogs,data.rewardLogs || [],'rewardLogId')
+          .sort((a,b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+        state.rewardLogNextPageToken = pagination.rewardNextPageToken || '';
+        state.groupRewardLogNextPageToken = pagination.groupRewardNextPageToken || '';
+        state.rewardLogHasMore = !!pagination.rewardHasMore;
+        state.groupRewardLogHasMore = !!pagination.groupRewardHasMore;
+        renderRewardLogs();
+      }).catch((err) => showMessage('#rewardLogsMessage',errorMessage(err),'error'))
+        .finally(() => { button.disabled = false; });
+    }
+
+    function appendUniqueRows_(currentRows,newRows,idField){
+      const rows = Array.isArray(currentRows) ? currentRows.slice() : [];
+      const seen = new Set(rows.map((row) => String(row[idField] || '')));
+      (newRows || []).forEach((row) => {
+        const id = String(row[idField] || '');
+        if(id && seen.has(id)) return;
+        if(id) seen.add(id);
+        rows.push(row);
+      });
+      return rows;
+    }
+
     function renderActivityAnalysis(){
       const analysis = state.activityAnalysis || {};
 
       $('#activityAnalysis').innerHTML =
-        '<div class="metric"><span>操作總數</span><strong>' + number(analysis.totalCount) + '</strong></div>' +
-        '<div class="metric"><span>近 7 日操作</span><strong>' + number(analysis.recent7DaysCount) + '</strong></div>' +
+        '<div class="metric"><span>近期操作</span><strong>' + number(analysis.totalCount) + '</strong></div>' +
+        '<div class="metric"><span>近期資料中的近 7 日</span><strong>' + number(analysis.recent7DaysCount) + '</strong></div>' +
         '<div class="metric"><span>操作種類</span><strong>' + number(analysis.actionTypeCount) + '</strong></div>' +
         '<div class="metric"><span>最後操作</span><strong>' + esc(analysis.latestAt || '-').replace(/ /g,'<br>') + '</strong></div>';
 
@@ -564,10 +702,11 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       const analysis = state.rewardAnalysis || {};
 
       $('#rewardAnalysis').innerHTML =
-        '<div class="metric"><span>積分紀錄</span><strong>' + number(analysis.totalCount) + '</strong></div>' +
-        '<div class="metric"><span>貢獻點數</span><strong>' + number(analysis.totalScore) + '</strong></div>' +
-        '<div class="metric"><span>小組點數</span><strong>' + number(analysis.totalJourneyScore) + '</strong></div>' +
-        '<div class="metric"><span>近 7 日熱度</span><strong>' + number(analysis.recent7DaysScore) + '</strong></div>';
+        '<div class="metric"><span>近期積分紀錄</span><strong>' + number(analysis.totalCount) + '</strong></div>' +
+        '<div class="metric"><span>個人貢獻</span><strong>' + number(analysis.totalScore) + '</strong></div>' +
+        '<div class="metric"><span>小組共同</span><strong>' + number(analysis.totalCooperativeScore) + '</strong></div>' +
+        '<div class="metric"><span>旅程總點數</span><strong>' + number(analysis.totalJourneyScore) + '</strong></div>' +
+        '<div class="metric"><span>近 7 日旅程</span><strong>' + number(analysis.recent7DaysScore) + '</strong></div>';
 
       renderMiniList('#rewardTopPlayers',analysis.topPlayers || [],(row) => ({
         title:row.name,
@@ -577,19 +716,19 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
 
       renderMiniList('#rewardTopGroups',analysis.topGroups || [],(row) => ({
         title:row.name,
-        note:'小組 +' + number(row.journeyScore) + '｜貢獻 +' + number(row.totalScore) + '｜' + number(row.count) + ' 筆',
+        note:'旅程 +' + number(row.journeyScore) + '｜個人 +' + number(row.totalScore) + '｜共同 +' + number(row.cooperativeScore) + '｜' + number(row.count) + ' 筆',
         time:''
       }));
 
       renderMiniList('#rewardSourceBreakdown',analysis.sourceBreakdown || [],(row) => ({
         title:row.name,
-        note:number(row.count) + ' 筆｜小組 +' + number(row.journeyScore),
+        note:number(row.count) + ' 筆｜旅程 +' + number(row.journeyScore) + '｜共同 +' + number(row.cooperativeScore),
         time:''
       }));
 
       renderMiniList('#rewardDailyTrend',analysis.dailyTrend || [],(row) => ({
         title:row.name,
-        note:number(row.count) + ' 筆｜小組 +' + number(row.journeyScore),
+        note:number(row.count) + ' 筆｜旅程 +' + number(row.journeyScore) + '｜共同 +' + number(row.cooperativeScore),
         time:''
       }));
     }
@@ -605,19 +744,122 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
           '<td>' + esc(l.createdAt) + '</td></tr>'
         ).join('')
         : '<tr><td colspan="4">尚無活動紀錄</td></tr>';
+
+      $('#loadMoreAdminLogsBtn').classList.toggle('hidden',!state.adminLogHasMore);
     }
 
     function renderRewardLogs(){
       renderRewardAnalysis();
 
       $('#rewardLogsBody').innerHTML = state.rewardLogs.length
-        ? state.rewardLogs.map((l) =>
-          '<tr><td>' + esc(l.playerName || l.playerId) + '<br><small>' + esc(l.groupName || '-') + '</small></td>' +
-          '<td>' + esc(l.sourceType) + '</td>' +
-          '<td>總分 ' + number(l.totalScore) + '<br><small>旅程 ' + number(l.journeyScore) + '</small></td>' +
-          '<td>' + esc(l.createdAt) + '</td></tr>'
-        ).join('')
+        ? state.rewardLogs.map((l) => {
+          const isGroupReward = l.recordKind === 'GROUP';
+          const ownerText = isGroupReward ? '小組共同獎勵' : (l.playerName || l.playerId);
+          const scoreText = isGroupReward
+            ? '共同 ' + number(l.cooperativeScore) + '<br><small>旅程 ' + number(l.journeyScore) + '</small>'
+            : '個人 ' + number(l.totalScore) + '<br><small>旅程 ' + number(l.journeyScore) + '</small>';
+
+          return '<tr><td>' + esc(ownerText) + '<br><small>' + esc(l.groupName || '-') + '</small></td>' +
+            '<td>' + esc(l.sourceType) + '</td>' +
+            '<td>' + scoreText + '</td>' +
+            '<td>' + esc(l.createdAt) + '</td></tr>';
+        }).join('')
         : '<tr><td colspan="4">尚無積分紀錄</td></tr>';
+
+      $('#loadMoreRewardLogsBtn').classList.toggle(
+        'hidden',
+        !state.rewardLogHasMore && !state.groupRewardLogHasMore
+      );
+    }
+
+    function loadGroupPosts(force){
+      if(state.groupPosts.length && !force) return renderGroupPosts();
+
+      if(force){
+        state.groupPosts = [];
+        state.groupPostNextPageToken = '';
+        state.groupPostHasMore = false;
+      }
+
+      setLoading(true,'讀取小組公告...');
+      callServer('adminGetGroupPosts',state.token,{
+        status:$('#groupPostStatusFilter').value || 'active',
+        pageSize:50,
+        pageToken:''
+      }).then((res) => {
+        if(!isSuccess(res)) return showMessage('#groupPostsMessage',responseError(res,'讀取小組公告失敗'),'error');
+        state.groupPosts = res.data.posts || [];
+        state.groupPostNextPageToken = res.data.nextPageToken || '';
+        state.groupPostHasMore = !!res.data.hasMore;
+        renderGroupPosts();
+        showMessage('#groupPostsMessage','小組公告已更新','success');
+      }).catch((err) => showMessage('#groupPostsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function loadMoreGroupPosts(){
+      if(!state.groupPostHasMore || !state.groupPostNextPageToken) return;
+      setLoading(true,'載入較舊小組公告...');
+      callServer('adminGetGroupPosts',state.token,{
+        status:$('#groupPostStatusFilter').value || 'active',
+        pageSize:50,
+        pageToken:state.groupPostNextPageToken
+      }).then((res) => {
+        if(!isSuccess(res)) return showMessage('#groupPostsMessage',responseError(res,'載入較舊公告失敗'),'error');
+        state.groupPosts = state.groupPosts.concat(res.data.posts || []);
+        state.groupPostNextPageToken = res.data.nextPageToken || '';
+        state.groupPostHasMore = !!res.data.hasMore;
+        renderGroupPosts();
+      }).catch((err) => showMessage('#groupPostsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function renderGroupPosts(){
+      const key = normalize($('#groupPostSearch').value);
+      const rows = (state.groupPosts || []).filter((post) => {
+        const text = normalize([post.groupName,post.playerName,post.content].join(' '));
+        return !key || text.includes(key);
+      });
+
+      $('#groupPostsBody').innerHTML = rows.length ? rows.map((post) => {
+        const active = post.status === 'active';
+        const action = active
+          ? '<button class="btn small red" data-action="group-post-delete" data-post-id="' + esc(post.postId || '') + '">移除</button>'
+          : '';
+        return '<tr>' +
+          '<td>' + esc(post.groupName || post.groupId || '-') + '</td>' +
+          '<td>' + esc(post.playerName || post.playerId || '-') + '</td>' +
+          '<td>' + esc(post.content || '') + '</td>' +
+          '<td><span class="pill ' + (active ? 'active' : 'disabled') + '">' + (active ? '顯示中' : '已移除') + '</span></td>' +
+          '<td>' + esc(post.updatedAt || post.createdAt || '-') + '</td>' +
+          '<td><div class="row-actions">' + action + '</div></td>' +
+        '</tr>';
+      }).join('') : '<tr><td colspan="6">沒有符合條件的小組公告</td></tr>';
+      $('#loadMoreGroupPostsBtn').classList.toggle('hidden',!state.groupPostHasMore);
+    }
+
+    function handleGroupPostAction(event){
+      const button = event.target.closest('button[data-action="group-post-delete"]');
+      if(!button) return;
+      const postId = String(button.dataset.postId || '').trim();
+      if(!postId || !confirm('確定要由管理者移除這則小組公告？')) return;
+
+      setLoading(true,'移除小組公告...');
+      callServer('adminDeleteGroupPost',state.token,postId).then((res) => {
+        if(!isSuccess(res)) return showMessage('#groupPostsMessage',responseError(res,'移除小組公告失敗'),'error');
+        if($('#groupPostStatusFilter').value === 'active'){
+          state.groupPosts = (state.groupPosts || []).filter((post) => String(post.postId || '') !== postId);
+        }else{
+          state.groupPosts = (state.groupPosts || []).map((post) =>
+            String(post.postId || '') === postId
+              ? Object.assign({},post,{status:'deleted'})
+              : post
+          );
+        }
+        renderGroupPosts();
+        showMessage('#groupPostsMessage',res.data.message || '小組公告已移除','success');
+      }).catch((err) => showMessage('#groupPostsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
     }
 
     function loadCycles(force){
@@ -689,7 +931,10 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
     }
 
     function loadChests(force){
-      if(state.chests.length && !force) return renderChests();
+      if(state.chests.length && !force){
+        renderChests();
+        return loadChestRewardClaims(true);
+      }
 
       setLoading(true,'讀取寶箱設定...');
       callServer('adminGetChestSettings',state.token).then((res) => {
@@ -698,6 +943,32 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         state.chests = res.data.chests || [];
         renderChests();
         showMessage('#chestsMessage','寶箱設定已更新','success');
+        loadChestRewardClaims(true);
+      }).catch((err) => showMessage('#chestsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function loadChestRewardClaims(reset){
+      if(reset){
+        state.chestClaims = [];
+        state.chestClaimNextPageToken = '';
+        state.chestClaimHasMore = false;
+      }else if(!state.chestClaimHasMore || !state.chestClaimNextPageToken){
+        return;
+      }
+
+      setLoading(true,reset ? '讀取寶箱發放紀錄...' : '載入較舊寶箱發放紀錄...');
+      callServer('adminGetChestRewardClaims',state.token,{
+        filter:$('#chestRewardClaimFilter').value || 'PENDING',
+        pageSize:50,
+        pageToken:reset ? '' : state.chestClaimNextPageToken
+      }).then((res) => {
+        if(!isSuccess(res)) return showMessage('#chestsMessage',responseError(res,'讀取寶箱發放紀錄失敗'),'error');
+        const rows = res.data.claims || [];
+        state.chestClaims = reset ? rows : state.chestClaims.concat(rows);
+        state.chestClaimNextPageToken = res.data.nextPageToken || '';
+        state.chestClaimHasMore = !!res.data.hasMore;
+        renderChestRewardClaims();
       }).catch((err) => showMessage('#chestsMessage',errorMessage(err),'error'))
         .finally(() => setLoading(false));
     }
@@ -712,7 +983,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         const chestId = chest.chestId || '';
         const rewardType = chest.rewardType === 'groupPoints' ? 'groupPoints' : 'other';
         const pointsField =
-          '<label class="field' + (rewardType === 'groupPoints' ? '' : ' hidden') + '" data-chest-points-wrap="' + esc(chestId) + '">小組點數<input type="number" min="0" step="1" value="' + esc(chest.groupBonusPoints || 0) + '" data-chest-points="' + esc(chestId) + '"></label>';
+          '<label class="field' + (rewardType === 'groupPoints' ? '' : ' hidden') + '" data-chest-points-wrap="' + esc(chestId) + '">小組點數<input type="number" min="0" max="1000000" step="1" value="' + esc(chest.groupBonusPoints || 0) + '" data-chest-points="' + esc(chestId) + '"></label>';
 
         return '<section class="setting-row">' +
           '<div class="setting-meta chest-setting-preview">' +
@@ -720,17 +991,61 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
             '<div><strong>' + esc(chest.chestId || '') + '</strong><p>' + esc(chest.stationKey ? '站點：' + chest.stationKey : '加入活力組取得') + '</p></div>' +
           '</div>' +
           '<div class="chest-setting-fields">' +
-            '<label class="field">寶箱名稱<input type="text" value="' + esc(chest.chestName || '') + '" data-chest-name="' + esc(chestId) + '"></label>' +
+            '<label class="field">寶箱名稱<input type="text" maxlength="50" value="' + esc(chest.chestName || '') + '" data-chest-name="' + esc(chestId) + '"></label>' +
             '<label class="field">獎勵方式<select data-chest-reward-type="' + esc(chestId) + '">' +
               '<option value="groupPoints"' + (rewardType === 'groupPoints' ? ' selected' : '') + '>小組點數</option>' +
               '<option value="other"' + (rewardType === 'other' ? ' selected' : '') + '>其他</option>' +
             '</select></label>' +
-            '<label class="field">獎勵說明<input type="text" value="' + esc(chest.rewardDescription || '') + '" data-chest-description="' + esc(chestId) + '"></label>' +
+            '<label class="field">獎勵說明<textarea maxlength="500" rows="3" data-chest-description="' + esc(chestId) + '">' + esc(chest.rewardDescription || '') + '</textarea></label>' +
             pointsField +
           '</div>' +
           '<button class="btn small primary" data-action="chest-save" data-chest-id="' + esc(chestId) + '">儲存</button>' +
         '</section>';
       }).join('');
+    }
+
+    function renderChestRewardClaims(){
+      const body = $('#chestRewardClaimsBody');
+      const rows = state.chestClaims || [];
+
+      body.innerHTML = rows.length ? rows.map((row) => {
+        const statusLabel = row.status === 'FULFILLED'
+          ? '已發放'
+          : (row.status === 'REQUESTED' ? '待發放' : '尚未領取');
+        const statusClass = row.status === 'FULFILLED'
+          ? 'active'
+          : (row.status === 'REQUESTED' ? '' : 'disabled');
+        const action = row.status === 'REQUESTED'
+          ? '<button class="btn small green" data-action="chest-fulfill" data-record-id="' + esc(row.recordId || '') + '">標記已發放</button>'
+          : '';
+
+        return '<tr>' +
+          '<td><div class="cell-main"><strong>' + esc(row.playerName || row.playerId || '') + '</strong><small>' + esc(row.groupName || '未分組') + '</small></div></td>' +
+          '<td><div class="cell-main"><strong>' + esc(row.chestName || row.chestId || '') + '</strong><small>' + esc(row.rewardDescription || '') + '</small></div></td>' +
+          '<td>' + esc(row.earnedAt || '-') +
+            (row.claimedAt ? '<br><small>申請：' + esc(row.claimedAt) + '</small>' : '') +
+            (row.fulfilledAt ? '<br><small>發放：' + esc(row.fulfilledAt) + '</small>' : '') + '</td>' +
+          '<td><span class="pill ' + statusClass + '">' + statusLabel + '</span></td>' +
+          '<td><div class="row-actions">' + action + '</div></td>' +
+        '</tr>';
+      }).join('') : '<tr><td colspan="5">目前沒有符合篩選條件的其他獎勵紀錄</td></tr>';
+      $('#loadMoreChestClaimsBtn').classList.toggle('hidden',!state.chestClaimHasMore);
+    }
+
+    function handleChestRewardClaimAction(e){
+      const button = e.target.closest('button[data-action="chest-fulfill"]');
+      if(!button) return;
+      const recordId = String(button.dataset.recordId || '').trim();
+      if(!recordId || !confirm('確定此寶箱獎勵已完成發放？')) return;
+
+      setLoading(true,'更新寶箱獎勵狀態...');
+      callServer('adminMarkChestRewardFulfilled',state.token,{recordId}).then((res) => {
+        if(!isSuccess(res)) return showMessage('#chestsMessage',responseError(res,'更新寶箱獎勵狀態失敗'),'error');
+        notifyUserAppInstances_('chestFulfillmentChanged');
+        loadChestRewardClaims(true);
+        showMessage('#chestsMessage',res.data.message || '獎勵已標記為已發放','success');
+      }).catch((err) => showMessage('#chestsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
     }
 
     function handleChestAction(e){
@@ -739,17 +1054,33 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
 
       const chestId = b.dataset.chestId || '';
       const nameInput = document.querySelector('input[data-chest-name="' + cssEscape(chestId) + '"]');
-      const descriptionInput = document.querySelector('input[data-chest-description="' + cssEscape(chestId) + '"]');
+      const descriptionInput = document.querySelector('[data-chest-description="' + cssEscape(chestId) + '"]');
       const rewardTypeInput = document.querySelector('select[data-chest-reward-type="' + cssEscape(chestId) + '"]');
       const pointsInput = document.querySelector('input[data-chest-points="' + cssEscape(chestId) + '"]');
+      const chestName = nameInput ? nameInput.value.trim() : '';
+      const rewardDescription = descriptionInput ? descriptionInput.value.trim() : '';
+      const groupBonusPoints = Number(pointsInput ? pointsInput.value : 0);
+
+      if(chestName.length > 50){
+        showMessage('#chestsMessage','寶箱名稱不可超過 50 個字','error');
+        return;
+      }
+      if(rewardDescription.length > 500){
+        showMessage('#chestsMessage','獎勵說明不可超過 500 個字','error');
+        return;
+      }
+      if(!Number.isFinite(groupBonusPoints) || groupBonusPoints < 0 || groupBonusPoints > 1000000){
+        showMessage('#chestsMessage','小組點數需為 0 至 1,000,000','error');
+        return;
+      }
 
       setLoading(true,'儲存寶箱設定...');
       callServer('adminUpdateChestSetting',state.token,{
         chestId,
-        chestName:nameInput ? nameInput.value : '',
-        rewardDescription:descriptionInput ? descriptionInput.value : '',
+        chestName,
+        rewardDescription,
         rewardType:rewardTypeInput ? rewardTypeInput.value : 'other',
-        groupBonusPoints:pointsInput ? pointsInput.value : 0
+        groupBonusPoints
       }).then((res) => {
         if(!isSuccess(res)) return showMessage('#chestsMessage',responseError(res,'儲存寶箱設定失敗'),'error');
 
@@ -816,6 +1147,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       callServer('adminSaveSystemAnnouncement',state.token,payload).then((res) => {
         if(!isSuccess(res)) return showMessage('#systemAnnouncementsMessage',responseError(res,'儲存系統公告失敗'),'error');
 
+        notifyUserAppInstances_('systemAnnouncementChanged');
         resetSystemAnnouncementForm();
         state.systemAnnouncements = [];
         showMessage('#systemAnnouncementsMessage',res.data.message || '系統公告已儲存','success');
@@ -889,6 +1221,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       setLoading(true,status === 'active' ? '啟用公告...' : '停用公告...');
       callServer('adminSetSystemAnnouncementStatus',state.token,{announcementId,status}).then((res) => {
         if(!isSuccess(res)) return showMessage('#systemAnnouncementsMessage',responseError(res,'更新公告狀態失敗'),'error');
+        notifyUserAppInstances_('systemAnnouncementStatusChanged');
         state.systemAnnouncements = [];
         showMessage('#systemAnnouncementsMessage',res.data.message || '公告狀態已更新','success');
         loadSystemAnnouncements(true);
@@ -900,6 +1233,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       setLoading(true,'刪除草稿公告...');
       callServer('adminDeleteSystemAnnouncement',state.token,announcementId).then((res) => {
         if(!isSuccess(res)) return showMessage('#systemAnnouncementsMessage',responseError(res,'刪除公告失敗'),'error');
+        notifyUserAppInstances_('systemAnnouncementDeleted');
         state.systemAnnouncements = [];
         resetSystemAnnouncementForm();
         showMessage('#systemAnnouncementsMessage',res.data.message || '草稿公告已刪除','success');
@@ -977,6 +1311,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       callServer('adminSaveSpecialTask',state.token,payload).then((res) => {
         if(!isSuccess(res)) return showMessage('#specialTasksMessage',responseError(res,'儲存特殊任務失敗'),'error');
 
+        notifyUserAppInstances_('specialTaskChanged');
         resetSpecialTaskForm();
         state.specialTasks = [];
         showMessage('#specialTasksMessage',res.data.message || '特殊任務已儲存','success');
@@ -1010,7 +1345,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
           '<td>' + esc(specialTaskRewardText(task)) + '</td>' +
           '<td>' + esc(formatDisplayPeriod(task.startAt,task.endAt)) + '</td>' +
           '<td><span class="pill ' + statusClass + '">' + esc(moduleStatusLabel(status)) + '</span></td>' +
-          '<td><div class="status-summary"><span class="pill">完成 ' + number(summary.confirmedCount || 0) + '</span><span class="pill active">資格 ' + number(summary.eligibleCount || 0) + '</span><span class="pill">已發 ' + number(summary.sentCount || 0) + '</span></div></td>' +
+          '<td><div class="status-summary"><span class="pill">完成 ' + number(summary.confirmedCount || 0) + '</span><span class="pill active">資格 ' + number(summary.eligibleCount || 0) + '</span><span class="pill">已處理 ' + number(summary.processedCount || 0) + esc(summary.processedUnit || '') + '</span></div></td>' +
           '<td>v' + number(task.version || 1) + '</td>' +
           '<td><div class="cell-main"><strong>' + esc(task.updatedAt || '') + '</strong><small>' + esc(task.updatedBy || '') + '</small></div></td>' +
           '<td><div class="row-actions"><button class="btn small" data-action="task-manage" data-id="' + id + '">名單／發獎</button><button class="btn small" data-action="task-edit" data-id="' + id + '">編輯</button>' + actionStatus + deleteButton + '</div></td>' +
@@ -1061,6 +1396,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       setLoading(true,status === 'active' ? '啟用特殊任務...' : '停用特殊任務...');
       callServer('adminSetSpecialTaskStatus',state.token,{taskId,status}).then((res) => {
         if(!isSuccess(res)) return showMessage('#specialTasksMessage',responseError(res,'更新任務狀態失敗'),'error');
+        notifyUserAppInstances_('specialTaskStatusChanged');
         state.specialTasks = [];
         showMessage('#specialTasksMessage',res.data.message || '任務狀態已更新','success');
         loadSpecialTasks(true);
@@ -1072,6 +1408,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       setLoading(true,'刪除草稿任務...');
       callServer('adminDeleteSpecialTask',state.token,taskId).then((res) => {
         if(!isSuccess(res)) return showMessage('#specialTasksMessage',responseError(res,'刪除特殊任務失敗'),'error');
+        notifyUserAppInstances_('specialTaskDeleted');
         state.specialTasks = [];
         resetSpecialTaskForm();
         if(state.selectedSpecialTaskId === taskId) closeSpecialTaskWorkspace();
@@ -1222,6 +1559,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       }).then((res) => {
         if(!isSuccess(res)) return showMessage('#specialTasksMessage',responseError(res,'確認完成者名單失敗'),'error');
 
+        notifyUserAppInstances_('specialTaskResultsChanged');
         state.specialTaskResults = res.data.results || null;
         renderSpecialTaskResults();
         clearSpecialTaskCsvPreview();
@@ -1260,7 +1598,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       ].join('');
 
       $('#specialTaskGroupStatsBody').innerHTML = (payload.groups || []).map((group) => {
-        return '<tr><td>' + esc(group.groupName || group.groupId || '') + '</td><td>' + number(group.completedCount || 0) + '／' + number(group.memberCount || 0) + '</td><td>' + number(group.eligibleCount || 0) + '</td><td>' + number(group.sentCount || 0) + '</td><td>' + number(group.failedCount || 0) + '</td></tr>';
+        return '<tr><td>' + esc(group.groupName || group.groupId || '') + '</td><td>' + number(group.completedCount || 0) + '／' + number(group.memberCount || 0) + '</td><td>' + number(group.eligibleCount || 0) + '</td><td>' + number(group.processedCount || 0) + esc(group.processedUnit || '') + '</td><td>' + number(group.failedCount || 0) + '</td></tr>';
       }).join('') || '<tr><td colspan="5">尚未確認完成者</td></tr>';
 
       $('#specialTaskResultsBody').innerHTML = (payload.rows || []).map((row) => {
@@ -1272,7 +1610,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
           : '';
 
         return '<tr>' +
-          '<td><div class="cell-main"><strong>' + esc(row.playerNameSnapshot || '') + '</strong><small>' + esc(row.playerId || '') + '</small></div></td>' +
+          '<td><div class="cell-main"><strong>' + esc(row.playerName || row.playerNameSnapshot || '') + '</strong><small>' + esc(row.playerId || '') + '</small></div></td>' +
           '<td>' + esc((row.careDistrictSnapshot || '') + '／' + (row.careAreaSnapshot || '')) + '</td>' +
           '<td><div class="cell-main"><strong>' + esc(row.groupNameSnapshot || '') + '</strong><small>名單 ' + number(row.groupCompletedCount || 0) + '／同組 ' + number(row.groupMemberCount || 0) + ' 人</small></div></td>' +
           '<td><span class="pill ' + (row.eligible ? 'active' : '') + '">' + esc(eligibleText) + '</span></td>' +
@@ -1280,7 +1618,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
           '<td>' + esc(detail) + '</td>' +
           '<td><div class="row-actions">' + action + '</div></td>' +
         '</tr>';
-      }).join('') || '<tr><td colspan="6">尚未確認完成者</td></tr>';
+      }).join('') || '<tr><td colspan="7">尚未確認完成者</td></tr>';
 
       $('#sendSpecialTaskRewardsBtn').disabled = !(payload.rows || []).length;
     }
@@ -1296,6 +1634,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       setLoading(true,'更新獎勵發放狀態...');
       callServer('adminMarkSpecialTaskRewardFulfilled',state.token,{resultId}).then((res) => {
         if(!isSuccess(res)) return showMessage('#specialTaskSendResult',responseError(res,'更新獎勵狀態失敗'),'error');
+        notifyUserAppInstances_('specialTaskFulfillmentChanged');
         state.specialTaskResults = res.data.results || null;
         renderSpecialTaskResults();
         showMessage('#specialTaskSendResult',res.data.message || '獎勵已標記為已發放','success');
@@ -1313,6 +1652,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       callServer('adminSendSpecialTaskRewards',state.token,state.selectedSpecialTaskId).then((res) => {
         if(!isSuccess(res)) return showMessage('#specialTaskSendResult',responseError(res,'發送獎勵失敗'),'error');
 
+        notifyUserAppInstances_('specialTaskRewardsChanged');
         const summary = res.data.summary || {};
         const failedDetails = (res.data.details || []).filter((item) => item.status === 'FAILED');
         const lines = [
@@ -1559,8 +1899,11 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       const archiveRequest = callServer('adminGetDataArchiveStatus',state.token)
         .then((response) => ({ fulfilled:true, response:response }))
         .catch((error) => ({ fulfilled:false, error:error }));
+      const repairRequest = callServer('adminGetFix12DataRepairStatus',state.token)
+        .then((response) => ({ fulfilled:true, response:response }))
+        .catch((error) => ({ fulfilled:false, error:error }));
 
-      Promise.all([migrationRequest,archiveRequest]).then(([migrationResult,archiveResult]) => {
+      Promise.all([migrationRequest,archiveRequest,repairRequest]).then(([migrationResult,archiveResult,repairResult]) => {
         if(!migrationResult.fulfilled){
           throw new Error('資料升級主狀態傳輸失敗：' + errorMessage(migrationResult.error));
         }
@@ -1572,6 +1915,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
 
         state.migration = statusRes.data || {};
         let archiveWarning = '';
+        let repairWarning = '';
         if(archiveResult.fulfilled && isSuccess(archiveResult.response)){
           state.archiveMaintenance = archiveResult.response.data || {};
         }else{
@@ -1580,11 +1924,20 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
             ? responseError(archiveResult.response,'封存狀態讀取失敗')
             : '封存狀態傳輸失敗：' + errorMessage(archiveResult.error);
         }
+        if(repairResult.fulfilled && isSuccess(repairResult.response)){
+          state.fix12Repairs = repairResult.response.data || {};
+        }else{
+          state.fix12Repairs = null;
+          repairWarning = repairResult.fulfilled
+            ? responseError(repairResult.response,'安全資料整理狀態讀取失敗')
+            : '安全資料整理狀態傳輸失敗：' + errorMessage(repairResult.error);
+        }
 
         renderMigration();
         const diagnostics = Array.isArray(state.migration.diagnostics)
           ? state.migration.diagnostics.filter(Boolean) : [];
         if(archiveWarning) diagnostics.push(archiveWarning);
+        if(repairWarning) diagnostics.push(repairWarning);
 
         if(state.migration.statusDegraded || diagnostics.length){
           showMessage('#v0131MigrationMessage',
@@ -1721,7 +2074,109 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       $('#resetV0132MigrationBtn').disabled = !migrationStatusAvailable || migrationStatus !== 'FAILED' ||
         phase !== 'PRECHECK' || number(migration.migratedLocatorCount || 0) > 0;
 
+      renderFix12DataRepairs();
       renderArchiveMaintenance();
+    }
+
+    function fix12RepairStatusLabel(value){
+      return {
+        NOT_STARTED:'尚未開始', PREVIEWED:'已完成預覽', RUNNING:'執行中',
+        PAUSED:'等待續跑', FAILED:'執行失敗', COMPLETED:'已完成'
+      }[String(value || '').toUpperCase()] || String(value || '尚未開始');
+    }
+
+    function fix12RepairPhaseLabel(value){
+      return {
+        PREVIEW:'等待預覽', GROUP_POSTS:'整理小組公告',
+        GROUP_TASKS:'回填共同任務', VERIFY:'完成後核對', DONE:'全部完成'
+      }[String(value || '').toUpperCase()] || String(value || '尚未開始');
+    }
+
+    function renderFix12DataRepairs(){
+      const status = state.fix12Repairs || {};
+      const preview = status.preview || {};
+      const previewPosts = preview.groupPosts || {};
+      const previewTasks = preview.groupTasks || {};
+      const groupPosts = status.groupPosts || {};
+      const groupTasks = status.groupTasks || {};
+      const progress = status.progress || {};
+      const backups = Array.isArray(status.backups) ? status.backups : [];
+      const errors = Array.isArray(status.errors) ? status.errors : [];
+      const warnings = Array.isArray(status.warnings) ? status.warnings : [];
+
+      $('#fix12OverallRepairStatus').textContent =
+        fix12RepairStatusLabel(status.status) + '｜' + fix12RepairPhaseLabel(status.phase);
+      $('#fix12GroupPostsRepairStatus').textContent = status.preview
+        ? ('預計 ' + number(previewPosts.totalUpdates || 0) +
+          '｜已處理 ' + number(groupPosts.processed || 0) +
+          '｜刪除重複 ' + number(groupPosts.deletedDuplicateCount || 0))
+        : '尚未預覽';
+      $('#fix12GroupTasksRepairStatus').textContent = status.preview
+        ? ('任務 ' + number(previewTasks.relevantTaskCount || 0) +
+          '｜每日待補 ' + number(previewTasks.plannedDailyBackfillCount || 0) +
+          '｜每週待補 ' + number(previewTasks.plannedWeeklyBackfillCount || 0) +
+          '｜已處理 ' + number(groupTasks.processed || 0))
+        : '尚未預覽';
+      $('#fix12BackupProgressStatus').textContent =
+        '備份 ' + number(backups.length) + ' 份｜' +
+        number(progress.processed || 0) + '／' + number(progress.total || 0) +
+        (number(progress.skipped || 0) ? '｜跳過 ' + number(progress.skipped || 0) : '');
+
+      $('#previewFix12DataRepairsBtn').disabled = status.status === 'RUNNING';
+      $('#runFix12DataRepairBatchBtn').disabled = !status.preview || !!status.completed;
+      $('#runFix12DataRepairBatchBtn').textContent = status.completed
+        ? '安全資料整理已完成'
+        : (status.status === 'PREVIEWED' ? '開始正式整理' : '執行下一批');
+
+      const details = [];
+      if(status.preview){
+        details.push('預覽時間：' + String(preview.createdAt || ''));
+        details.push('公告重複群組：' + number(previewPosts.duplicateGroupCount || 0) +
+          '；異常資料：' + number(previewPosts.anomalyCount || 0));
+        details.push('可靠任務：' + number(previewTasks.reliableTaskCount || 0) +
+          '；無法可靠判定：' + number(previewTasks.unreliableTaskCount || 0));
+      }
+      if(backups.length){
+        details.push('備份：' + backups.map((item) => String(item.backupName || '')).join('、'));
+      }
+      warnings.slice(-3).forEach((item) => details.push('警告：' + String(item.message || '')));
+      errors.slice(-3).forEach((item) => details.push('錯誤：' + String(item.message || '')));
+
+      if(details.length){
+        showMessage('#fix12DataRepairsMessage',details.join('\n'),errors.length ? 'error' : 'info');
+      }else{
+        showMessage('#fix12DataRepairsMessage','請先執行預覽；預覽不會修改資料。','info');
+      }
+    }
+
+    function previewFix12DataRepairs(){
+      setLoading(true,'分析安全資料整理影響範圍...');
+      callServer('adminPreviewFix12DataRepairs',state.token).then((res) => {
+        if(!isSuccess(res)) return showMessage('#fix12DataRepairsMessage',responseError(res,'預覽失敗'),'error');
+        state.fix12Repairs = res.data.status || {};
+        renderFix12DataRepairs();
+        showMessage('#fix12DataRepairsMessage',res.data.message || '預覽完成，尚未修改資料。','success');
+      }).catch((err) => showMessage('#fix12DataRepairsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
+    }
+
+    function runFix12DataRepairBatch(){
+      const status = state.fix12Repairs || {};
+      const firstRun = !Array.isArray(status.backups) || !status.backups.length;
+      if(firstRun && !confirm('正式執行前會先建立備份，並依預覽結果分批整理資料。\n\n公告只會在相同「週目＋小組＋使用者」範圍內去除重複；共同任務只回填可由歷史資料可靠判定的組員。\n\n確定開始？')) return;
+      setLoading(true,firstRun ? '建立備份並執行第一批...' : '執行下一批資料整理...');
+      callServer(
+        'adminRunFix12DataRepairBatch',
+        state.token,
+        'EXECUTE_V01321_FIX12_DATA_REPAIR',
+        {batchSize:20}
+      ).then((res) => {
+        if(!isSuccess(res)) return showMessage('#fix12DataRepairsMessage',responseError(res,'安全資料整理失敗'),'error');
+        state.fix12Repairs = res.data.status || {};
+        renderFix12DataRepairs();
+        showMessage('#fix12DataRepairsMessage',res.data.message || '本批處理完成。','success');
+      }).catch((err) => showMessage('#fix12DataRepairsMessage',errorMessage(err),'error'))
+        .finally(() => setLoading(false));
     }
 
     function renderArchiveMaintenance(){
@@ -2078,8 +2533,19 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
     }
 
     function setLoading(active,text){
-      $('#loading').classList.toggle('hidden',!active);
-      $('#loadingText').textContent = text || '處理中...';
+      if(active){
+        state.loadingDepth += 1;
+        if(text) $('#loadingText').textContent = text;
+      }else{
+        state.loadingDepth = Math.max(0,state.loadingDepth - 1);
+      }
+
+      const visible = state.loadingDepth > 0;
+      $('#loading').classList.toggle('hidden',!visible);
+
+      if(visible && !$('#loadingText').textContent){
+        $('#loadingText').textContent = '處理中...';
+      }
     }
 
     function showMessage(selector,text,type){
