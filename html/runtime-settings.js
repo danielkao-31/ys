@@ -6,7 +6,7 @@
  */
 window.APP_RUNTIME_CONFIG = Object.freeze({
   gasWebAppUrl: 'https://script.google.com/macros/s/AKfycbwP3NSPi1CXfUeaMkLj_bvae3kQgCrP0-8QYfrA4EmWAemTqMIBJxrjGzcBG2uDjPOI/exec',
-  adminGasWebAppUrl: 'https://script.google.com/macros/s/AKfycbzDn10QPub6PXuJ8AAPJtEwCP0n48_iqv3HjEsni2Ou8pXDAURWtxXWMQaUkB3C6WmT/exec',
+  adminGasWebAppUrl: '',
   expectedApiContractVersion: '1.1.0',
   assetVersion: '20260728-btest-rc5'
 });
