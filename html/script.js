@@ -5,7 +5,7 @@ const STORAGE_KEY = 'yct_current_player';
   const ASSET_BASE_URL = '..';
   const REMOTE_AVATAR_BASE_URL =
     'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const ASSET_VERSION = '20260728-v01321-fix12-rc12';
+  const ASSET_VERSION = '20260728-v01321-fix12-rc13';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -135,22 +135,22 @@ const STORAGE_KEY = 'yct_current_player';
       performance && performance.totalMilliseconds || 0
     ) / 1000;
     const stages = performance && performance.stages || {};
-    const slowestStage = Object.keys(stages).reduce((best, stageName) => {
-      const milliseconds = Number(stages[stageName] || 0);
-      return !best || milliseconds > best.milliseconds
-        ? { name: stageName, milliseconds: milliseconds }
-        : best;
-    }, null);
+    const rankedStages = Object.keys(stages).map((stageName) => ({
+      name: stageName,
+      milliseconds: Number(stages[stageName] || 0)
+    })).filter((stage) => stage.milliseconds > 0)
+      .sort((left, right) => right.milliseconds - left.milliseconds);
     const version = String(
       performance && performance.releaseVersion || '後端版本未知'
     );
-    const slowestText = slowestStage
-      ? '；最慢階段 ' + slowestStage.name + ' ' +
-        (slowestStage.milliseconds / 1000).toFixed(1) + ' 秒'
+    const stageText = rankedStages.length
+      ? '；階段 ' + rankedStages.slice(0, 5).map((stage) =>
+          stage.name + ' ' + (stage.milliseconds / 1000).toFixed(1) + ' 秒'
+        ).join('、')
       : '';
     return '任務已儲存（' + version + '；總計 ' +
       clientSeconds.toFixed(1) + ' 秒；後端 ' +
-      backendSeconds.toFixed(1) + ' 秒' + slowestText + '）';
+      backendSeconds.toFixed(1) + ' 秒' + stageText + '）';
   }
   const STALE_REQUEST_ERROR_CODE = 'STALE_REQUEST';
   const SERVER_MUTATION_APIS = new Set([
