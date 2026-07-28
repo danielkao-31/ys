@@ -1311,11 +1311,23 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       callServer('adminSaveSpecialTask',state.token,payload).then((res) => {
         if(!isSuccess(res)) return showMessage('#specialTasksMessage',responseError(res,'儲存特殊任務失敗'),'error');
 
+        const savedTask = res.data && res.data.task;
+        if(savedTask && savedTask.taskId){
+          const savedTaskId = String(savedTask.taskId);
+          const existingIndex = state.specialTasks.findIndex((task) => String(task.taskId || '') === savedTaskId);
+
+          if(existingIndex >= 0) state.specialTasks.splice(existingIndex,1,savedTask);
+          else state.specialTasks.unshift(savedTask);
+
+          state.specialTasks.sort((a,b) => String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || '')));
+          renderSpecialTasks();
+        }else{
+          state.specialTasks = [];
+        }
+
         notifyUserAppInstances_('specialTaskChanged');
         resetSpecialTaskForm();
-        state.specialTasks = [];
         showMessage('#specialTasksMessage',res.data.message || '特殊任務已儲存','success');
-        loadSpecialTasks(true);
       }).catch((err) => showMessage('#specialTasksMessage',errorMessage(err),'error'))
         .finally(() => setLoading(false));
     }
