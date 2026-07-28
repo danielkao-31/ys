@@ -5,7 +5,7 @@ const STORAGE_KEY = 'yct_current_player';
   const ASSET_BASE_URL = '..';
   const REMOTE_AVATAR_BASE_URL =
     'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const ASSET_VERSION = '20260728-v01321-fix12-rc10';
+  const ASSET_VERSION = '20260728-v01321-fix12-rc12';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -118,6 +118,40 @@ const STORAGE_KEY = 'yct_current_player';
   const HOME_SYNC_POLL_MS = 20 * 1000;
   const SERVER_READ_CALL_TIMEOUT_MS = 90 * 1000;
   const CACHE_LOADING_PROMISE_TTL_MS = SERVER_READ_CALL_TIMEOUT_MS + 5 * 1000;
+  const TASK_PERFORMANCE_PROBE_ENABLED = (() => {
+    try {
+      return new URLSearchParams(window.location.search).get('taskPerf') === '1';
+    } catch (error) {
+      return false;
+    }
+  })();
+
+  function formatTaskPerformanceMessage_(performance, clientStartedAt) {
+    const clientSeconds = Math.max(
+      0,
+      Date.now() - Number(clientStartedAt || Date.now())
+    ) / 1000;
+    const backendSeconds = Number(
+      performance && performance.totalMilliseconds || 0
+    ) / 1000;
+    const stages = performance && performance.stages || {};
+    const slowestStage = Object.keys(stages).reduce((best, stageName) => {
+      const milliseconds = Number(stages[stageName] || 0);
+      return !best || milliseconds > best.milliseconds
+        ? { name: stageName, milliseconds: milliseconds }
+        : best;
+    }, null);
+    const version = String(
+      performance && performance.releaseVersion || '後端版本未知'
+    );
+    const slowestText = slowestStage
+      ? '；最慢階段 ' + slowestStage.name + ' ' +
+        (slowestStage.milliseconds / 1000).toFixed(1) + ' 秒'
+      : '';
+    return '任務已儲存（' + version + '；總計 ' +
+      clientSeconds.toFixed(1) + ' 秒；後端 ' +
+      backendSeconds.toFixed(1) + ' 秒' + slowestText + '）';
+  }
   const STALE_REQUEST_ERROR_CODE = 'STALE_REQUEST';
   const SERVER_MUTATION_APIS = new Set([
     'loginPlayer', 'registerPlayer', 'logoutPlayer', 'updatePlayerAvatar', 'markPlayerMessageRead',
@@ -4541,15 +4575,17 @@ const STORAGE_KEY = 'yct_current_player';
     $('#practiceModalReward').textContent = config.reward;
 
     $('#practiceSubmitBtn').textContent = done
-      ? '今日已完成'
+      ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '今日已完成')
       : '確認完成';
 
-    $('#practiceSubmitBtn').disabled = done;
+    $('#practiceSubmitBtn').disabled = done && !TASK_PERFORMANCE_PROBE_ENABLED;
 
     setResultMessage(
       '#practiceModalMessage',
       done
-        ? '這項任務今天已完成，系統不會重複計入積分。'
+        ? (TASK_PERFORMANCE_PROBE_ENABLED
+            ? '防重測速只重送已完成狀態，不會新增任務或點數。'
+            : '這項任務今天已完成，系統不會重複計入積分。')
         : '',
       false
     );
@@ -4579,6 +4615,7 @@ const STORAGE_KEY = 'yct_current_player';
     state.pendingDailyRequestId = pendingDaily.requestId;
     payload.requestId = pendingDaily.requestId;
 
+    const taskRequestStartedAt = Date.now();
     setLoading(true, '儲存今日任務...');
 
     callServer('submitDailyPractice', payload)
@@ -4605,8 +4642,12 @@ const STORAGE_KEY = 'yct_current_player';
         renderPlayer(state.currentPlayer);
         renderDailyStatus();
         applyRewardSummaryToHome(res.data.rewardSummary);
-
+        const performanceMessage = formatTaskPerformanceMessage_(
+          res.data.performance,
+          taskRequestStartedAt
+        );
         closeModal('practiceModal');
+        setResultMessage('#homeMessage', performanceMessage, true);
       })
       .catch((error) => {
         setResultMessage('#practiceModalMessage', getErrorMessage(error));
@@ -4727,15 +4768,17 @@ const STORAGE_KEY = 'yct_current_player';
     $('#weeklyTaskModalReward').textContent = config.reward;
 
     $('#weeklyTaskSubmitBtn').textContent = done
-      ? '本週已完成'
+      ? (TASK_PERFORMANCE_PROBE_ENABLED ? '防重測速' : '本週已完成')
       : '確認完成';
 
-    $('#weeklyTaskSubmitBtn').disabled = done;
+    $('#weeklyTaskSubmitBtn').disabled = done && !TASK_PERFORMANCE_PROBE_ENABLED;
 
     setResultMessage(
       '#weeklyTaskModalMessage',
       done
-        ? '這項本週任務已完成，系統不會重複計入積分。'
+        ? (TASK_PERFORMANCE_PROBE_ENABLED
+            ? '防重測速只重送已完成狀態，不會新增任務或點數。'
+            : '這項本週任務已完成，系統不會重複計入積分。')
         : '',
       false
     );
@@ -4765,6 +4808,7 @@ const STORAGE_KEY = 'yct_current_player';
     state.pendingWeeklyRequestId = pendingMeeting.requestId;
     payload.requestId = pendingMeeting.requestId;
 
+    const taskRequestStartedAt = Date.now();
     setLoading(true, '儲存本週任務...');
 
     callServer('submitMeetingPractice', payload)
@@ -4791,8 +4835,12 @@ const STORAGE_KEY = 'yct_current_player';
         renderPlayer(state.currentPlayer);
         renderWeeklyTaskStatus();
         applyRewardSummaryToHome(res.data.rewardSummary);
-
+        const performanceMessage = formatTaskPerformanceMessage_(
+          res.data.performance,
+          taskRequestStartedAt
+        );
         closeModal('weeklyTaskModal');
+        setResultMessage('#homeMessage', performanceMessage, true);
       })
       .catch((error) => {
         setResultMessage('#weeklyTaskModalMessage', getErrorMessage(error));
