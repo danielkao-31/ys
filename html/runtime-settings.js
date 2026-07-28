@@ -1,12 +1,19 @@
-'use strict';
-
-/**
- * GitHub Pages 前端連接 GAS JSON API。
- * 前端不得放置試算表 ID、Drive 資料夾 ID 或管理密碼。
- */
-window.APP_RUNTIME_CONFIG = Object.freeze({
-  gasWebAppUrl: 'https://script.google.com/macros/s/AKfycbwP3NSPi1CXfUeaMkLj_bvae3kQgCrP0-8QYfrA4EmWAemTqMIBJxrjGzcBG2uDjPOI/exec',
-  adminGasWebAppUrl: '',
-  expectedApiContractVersion: '1.1.0',
-  assetVersion: '20260728-btest-rc5'
-});
+{
+  "name": "高雄青職｜活力同行",
+  "short_name": "活力同行",
+  "description": "高雄青職｜活力同行",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fffdf7",
+  "theme_color": "#8fd3ff",
+  "icons": [
+    {
+      "src": "../UI/app-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

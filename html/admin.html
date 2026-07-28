@@ -1,414 +1,625 @@
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-<meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="icon" type="image/png" href="../UI/app-icon.png">
-  <link rel="apple-touch-icon" href="../UI/app-icon.png">
-  <link rel="manifest" href="manifest.webmanifest?v=20260727-v01321-fix12-rc4">
-<meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="高雄青職｜活力同行">
-  <meta name="application-name" content="高雄青職｜活力同行">
-  <meta name="theme-color" content="#8fd3ff">
-  <title>高雄青職｜活力同行</title>
-  <link rel="stylesheet" href="admin.css?v=20260727-v01321-fix12-rc4">
-</head>
-<body>
-  <main class="shell">
-    <header class="topbar">
-      <div class="brand"><small>高雄青職｜活力同行</small><h1>管理者後台</h1><p>管理活力人、活力組、代禱事項、活動紀錄、積分紀錄與系統設定。</p></div>
-      <div class="toolbar"><button id="logoutBtn" class="btn red hidden" type="button">登出後台</button></div>
-    </header>
+:root {
+  --bg:#eef3f6;
+  --panel:#fff;
+  --soft:#f8fafb;
+  --ink:#1f2d3a;
+  --muted:#637283;
+  --line:#dce4ea;
+  --brand:#256f8f;
+  --brand-dark:#174d66;
+  --green:#208863;
+  --red:#bb3f46;
+  --amber:#b97922;
+  --shadow:0 16px 34px rgba(33,48,63,.12);
+  --radius:12px
+}
+* {
+  box-sizing:border-box
+}
+body {
+  margin:0;
+  min-height:100vh;
+  background:linear-gradient(180deg,rgba(255,255,255,.86),rgba(238,243,246,.94)),var(--bg);
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC","Microsoft JhengHei",sans-serif
+}
+h1,h2,h3,p {
+  margin:0
+}
+h1 {
+  font-size:28px;
+  line-height:1.15
+}
+h2 {
+  font-size:22px
+}
+h3 {
+  font-size:16px
+}
+p {
+  color:var(--muted);
+  line-height:1.55
+}
+button,input,select,textarea {
+  font:inherit
+}
+button {
+  cursor:pointer
+}
+button:disabled {
+  cursor:not-allowed;
+  opacity:.55
+}
+.hidden {
+  display:none!important
+}
+.shell {
+  width:min(1280px,100%);
+  margin:auto;
+  padding:18px
+}
+.topbar,.section-head,.toolbar,.row-actions {
+  display:flex;
+  gap:12px
+}
+.topbar,.section-head {
+  align-items:flex-start;
+  justify-content:space-between;
+  margin-bottom:14px
+}
+.toolbar,.row-actions {
+  flex-wrap:wrap;
+  align-items:center
+}
+.brand {
+  display:grid;
+  gap:4px
+}
+.brand small {
+  color:var(--brand);
+  font-weight:900
+}
+.panel {
+  background:rgba(255,255,255,.96);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow)
+}
+.layout {
+  display:grid;
+  grid-template-columns:210px minmax(0,1fr);
+  gap:14px;
+  align-items:start
+}
+.sidebar {
+  position:sticky;
+  top:12px;
+  padding:10px;
+  display:grid;
+  gap:6px
+}
+.tab-btn {
+  width:100%;
+  min-height:44px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:var(--muted);
+  text-align:left;
+  padding:0 12px;
+  font-weight:850
+}
+.tab-btn.active {
+  background:var(--brand);
+  color:#fff;
+  box-shadow:0 8px 16px rgba(37,111,143,.18)
+}
+.content,.section,.mini-list,.settings-grid {
+  display:grid;
+  gap:14px;
+  min-width:0
+}
+.section {
+  padding:16px
+}
+.login-card {
+  width:min(460px,100%);
+  margin:52px auto;
+  padding:24px;
+  display:grid;
+  gap:14px
+}
+.field {
+  display:grid;
+  gap:6px;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:850
+}
+input,select,textarea {
+  width:100%;
+  min-height:42px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  color:var(--ink);
+  padding:0 11px;
+  outline:none
+}
+input:focus,select:focus,textarea:focus {
+  border-color:var(--brand);
+  box-shadow:0 0 0 3px rgba(37,111,143,.12)
+}
+.search-input {
+  width:min(300px,100%)
+}
+.btn {
+  min-height:40px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  color:var(--ink);
+  padding:0 12px;
+  font-weight:850
+}
+.btn.primary {
+  border-color:var(--brand);
+  background:var(--brand);
+  color:#fff
+}
+.btn.green {
+  border-color:rgba(32,136,99,.2);
+  background:#e9f6f0;
+  color:var(--green)
+}
+.btn.red {
+  border-color:rgba(187,63,70,.2);
+  background:#fff0f1;
+  color:var(--red)
+}
+.btn.amber {
+  border-color:rgba(185,121,34,.22);
+  background:#fff6e7;
+  color:var(--amber)
+}
+.btn.small {
+  min-height:32px;
+  border-radius:8px;
+  font-size:13px;
+  padding:0 9px
+}
+.metrics {
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:10px
+}
+.metric {
+  padding:14px;
+  background:var(--soft);
+  border:1px solid var(--line);
+  border-radius:12px
+}
+.metric span {
+  color:var(--muted);
+  font-size:13px;
+  font-weight:850
+}
+.metric strong {
+  display:block;
+  margin-top:8px;
+  font-size:28px;
+  line-height:1;
+  color:var(--brand-dark)
+}
+.split {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px
+}
+.mini-item {
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  display:grid;
+  gap:4px
+}
+.mini-item strong {
+  font-size:14px
+}
+.mini-item small {
+  color:var(--muted)
+}
+.table-wrap {
+  width:100%;
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff
+}
+table {
+  width:100%;
+  min-width:980px;
+  border-collapse:collapse
+}
+th,td {
+  padding:10px;
+  border-bottom:1px solid #edf2f5;
+  text-align:left;
+  vertical-align:top;
+  font-size:13px;
+  line-height:1.45
+}
+th {
+  position:sticky;
+  top:0;
+  z-index:1;
+  background:#f5f8fa;
+  color:#465765;
+  font-weight:950
+}
+tr:last-child td {
+  border-bottom:0
+}
+.cell-main {
+  display:grid;
+  gap:4px
+}
+.cell-main small {
+  color:var(--muted)
+}
+.pill {
+  display:inline-flex;
+  align-items:center;
+  min-height:24px;
+  padding:0 8px;
+  border-radius:999px;
+  background:#edf3f6;
+  color:#526372;
+  font-size:12px;
+  font-weight:900;
+  white-space:nowrap
+}
+.pill.active,.pill.open,.pill.enabled {
+  background:#e8f6ef;
+  color:var(--green)
+}
+.pill.disabled {
+  background:#fff0f1;
+  color:var(--red)
+}
+.pill.closed {
+  background:#eceff2;
+  color:#6a737c
+}
+.message {
+  min-height:40px;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:#f8fafb;
+  color:var(--muted);
+  white-space:pre-wrap
+}
+.message.success {
+  border-color:#bce1cf;
+  background:#edf8f2;
+  color:var(--green);
+  font-weight:850
+}
+.message.error {
+  border-color:#f0bdc0;
+  background:#fff3f3;
+  color:var(--red);
+  font-weight:850
+}
+.setting-category {
+  display:grid;
+  gap:8px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--soft)
+}
+.setting-category h3 {
+  color:var(--brand-dark)
+}
+.setting-category p {
+  font-size:13px
+}
+.setting-health {
+  display:grid;
+  gap:8px
+}
+.setting-health .mini-item {
+  border-left:4px solid var(--brand)
+}
+.setting-health.is-healthy .mini-item {
+  border-left-color:var(--green);
+  background:#edf8f2
+}
+.setting-health.has-issues .mini-item {
+  border-left-color:var(--amber);
+  background:#fffaf0
+}
+.migration-status-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px
+}
+.migration-status-grid .mini-item {
+  min-height:76px
+}
+.migration-status-grid .mini-item strong {
+  color:var(--brand-dark)
+}
+.migration-error {
+  border-left:4px solid var(--red)
+}
+.setting-row {
+  display:grid;
+  grid-template-columns:minmax(220px,1fr) minmax(220px,1.35fr) auto;
+  gap:10px;
+  align-items:center;
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff
+}
+.setting-meta {
+  display:grid;
+  gap:4px
+}
+.setting-meta p {
+  font-size:12px
+}
+.setting-meta small {
+  color:var(--brand);
+  font-weight:800
+}
+.chest-setting-preview {
+  display:flex;
+  align-items:center;
+  gap:10px
+}
+.chest-setting-preview img {
+  width:54px;
+  height:54px;
+  object-fit:contain;
+  border-radius:10px;
+  background:#fff;
+  border:1px solid var(--line)
+}
+.chest-setting-fields {
+  display:grid;
+  gap:8px
+}
+.setting-target {
+  display:inline-flex;
+  width:max-content;
+  max-width:100%;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#e8f2f6;
+  color:var(--brand-dark);
+  font-size:11px;
+  font-weight:900
+}
+.setting-default {
+  display:inline-flex;
+  width:max-content;
+  max-width:100%;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#fff4d8;
+  color:#7a5a1f;
+  font-size:11px;
+  font-weight:900
+}
+.tool-form {
+  display:grid;
+  grid-template-columns:minmax(120px,180px) 1fr auto;
+  gap:10px;
+  align-items:end
+}
+.module-form{
+  display:grid;
+  gap:12px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--soft)
+}
+.module-form-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px
+}
+.module-form-grid .full{
+  grid-column:1/-1
+}
+textarea{
+  min-height:120px;
+  resize:vertical;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  color:var(--ink);
+  padding:10px 11px;
+  outline:none;
+  line-height:1.55
+}
+.module-toolbar{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center
+}
+.module-table-wrap{
+  max-height:460px
+}
+.module-workspace{
+  display:grid;
+  gap:14px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fbfcfd
+}
+.module-subsection{
+  display:grid;
+  gap:10px
+}
+.module-subsection h3{
+  color:var(--brand-dark)
+}
+.module-stats{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:8px
+}
+.module-stat{
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff
+}
+.module-stat span{
+  display:block;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:850
+}
+.module-stat strong{
+  display:block;
+  margin-top:5px;
+  color:var(--brand-dark);
+  font-size:22px
+}
+.csv-raw-preview{
+  max-height:180px;
+  margin:0;
+  padding:10px;
+  overflow:auto;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#17232d;
+  color:#eaf3f7;
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+  font-family:Consolas,"Courier New",monospace;
+  font-size:12px;
+  line-height:1.5
+}
+.inline-note{
+  color:var(--muted);
+  font-size:12px;
+  line-height:1.5
+}
+.status-summary{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px
+}
+.file-field{
+  position:relative;
+  display:inline-flex;
+  align-items:center
+}
+.file-field input[type="file"]{
+  position:absolute;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none
+}
+@media(max-width:980px) {
+  .module-stats{
+    grid-template-columns:repeat(2,minmax(0,1fr))
+  }
+}
+@media(max-width:620px) {
+  .module-form-grid,
+  .module-stats{
+    grid-template-columns:1fr
+  }
+  .module-form-grid .full{
+    grid-column:auto
+  }
+}
 
-    <section id="loginView" class="panel login-card">
-      <h2>管理者登入</h2>
-      <label class="field">管理者登入密碼<input
-        id="adminPasswordInput"
-        name="admin-login-password-input"
-        type="password"
-        autocomplete="new-password"
-        readonly
-        placeholder="輸入管理者密碼"
-      ></label>
-      <button id="loginBtn" class="btn primary" type="button">登入</button>
-      <div id="loginMessage" class="message">請使用管理者密碼登入。首次遷移後請到設定頁更新密碼。</div>
-    </section>
-
-    <section id="appView" class="layout hidden">
-      <nav class="sidebar panel" aria-label="後台分頁">
-        <button class="tab-btn active" data-tab="overview" type="button">總覽</button>
-        <button class="tab-btn" data-tab="players" type="button">活力人</button>
-        <button class="tab-btn" data-tab="groups" type="button">活力組</button>
-        <button class="tab-btn" data-tab="groupPosts" type="button">小組公告</button>
-        <button class="tab-btn" data-tab="cycles" type="button">週目</button>
-        <button class="tab-btn" data-tab="prayers" type="button">代禱</button>
-        <button class="tab-btn" data-tab="activityLogs" type="button">活動紀錄</button>
-        <button class="tab-btn" data-tab="rewardLogs" type="button">積分紀錄</button>
-        <button class="tab-btn" data-tab="chests" type="button">寶箱</button>
-        <button class="tab-btn" data-tab="systemAnnouncements" type="button">系統公告</button>
-        <button class="tab-btn" data-tab="specialTasks" type="button">特殊任務</button>
-        <button class="tab-btn" data-tab="migration" type="button">資料升級</button>
-        <button class="tab-btn" data-tab="settings" type="button">設定</button>
-      </nav>
-
-      <div class="content">
-        <section id="overviewTab" class="panel section">
-          <div class="section-head"><div><h2>系統總覽</h2><p id="overviewMeta">讀取中...</p></div><button class="btn primary" data-refresh="overview" type="button">更新總覽</button></div>
-          <div class="metrics">
-            <div class="metric"><span>活力人總數</span><strong id="metricPlayers">0</strong></div>
-            <div class="metric"><span>社青</span><strong id="metricSocialYoungPlayers">0</strong></div>
-            <div class="metric"><span>其他</span><strong id="metricOtherPlayers">0</strong></div>
-            <div class="metric"><span>活力組</span><strong id="metricGroups">0</strong></div>
-          </div>
-          <div class="split">
-            <section><h3>近期管理紀錄</h3><div id="recentAdminLogs" class="mini-list"></div></section>
-            <section><h3>待留意事項</h3><div id="attentionList" class="mini-list"></div></section>
-          </div>
-          <div id="overviewMessage" class="message"></div>
-        </section>
-
-        <section id="playersTab" class="panel section hidden">
-          <div class="section-head"><div><h2>活力人管理</h2><p>依出生年份自動分為：35 歲以下（含 35 歲）為社青；36 歲以上為其他。</p></div><button class="btn primary" data-refresh="players" type="button">更新活力人</button></div>
-          <div class="toolbar">
-            <input id="playerSearch" class="search-input" type="search" placeholder="搜尋姓名、帳號、照顧區、大區、活力組、ID">
-            <select id="playerAgeGroupFilter"><option value="all">全部年齡層</option><option value="社青">社青</option><option value="其他">其他</option><option value="未設定">未設定出生年</option></select>
-            <select id="playerStatusFilter"><option value="all">全部狀態</option><option value="active">啟用</option><option value="disabled">停用</option></select>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>活力人</th><th>年齡層</th><th>所屬</th><th>活力組</th><th>狀態</th><th>同行貢獻</th><th>登入</th><th>操作</th></tr></thead><tbody id="playersBody"></tbody></table></div>
-          <div id="playersMessage" class="message"></div>
-        </section>
-
-        <section id="groupsTab" class="panel section hidden">
-          <div class="section-head"><div><h2>活力組管理</h2><p>查看成員數、貢獻分數、邀請碼與啟用狀態。</p></div><button class="btn primary" data-refresh="groups" type="button">更新活力組</button></div>
-          <div class="toolbar"><input id="groupSearch" class="search-input" type="search" placeholder="搜尋組名、建立者、邀請碼"><select id="groupStatusFilter"><option value="all">全部活力組</option><option value="enabled">啟用</option><option value="disabled">停用</option></select></div>
-          <div class="table-wrap"><table><thead><tr><th>活力組</th><th>建立者</th><th>邀請碼</th><th>成員</th><th>貢獻</th><th>狀態</th><th>操作</th></tr></thead><tbody id="groupsBody"></tbody></table></div>
-          <div id="groupsMessage" class="message"></div>
-        </section>
-
-
-
-        <section id="groupPostsTab" class="panel section hidden">
-          <div class="section-head"><div><h2>小組公告管理</h2><p>查看各活力組公告，必要時由管理者移除。</p></div><button class="btn primary" data-refresh="groupPosts" type="button">更新小組公告</button></div>
-          <div class="toolbar">
-            <input id="groupPostSearch" class="search-input" type="search" placeholder="搜尋活力組、發布者、公告內容">
-            <select id="groupPostStatusFilter"><option value="active">只看顯示中</option><option value="all">全部狀態</option><option value="deleted">已移除</option></select>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>活力組</th><th>發布者</th><th>公告內容</th><th>狀態</th><th>時間</th><th>操作</th></tr></thead><tbody id="groupPostsBody"></tbody></table></div>
-          <div class="module-toolbar"><button id="loadMoreGroupPostsBtn" class="btn hidden" type="button">載入較舊公告</button></div>
-          <div id="groupPostsMessage" class="message"></div>
-        </section>
-
-        <section id="cyclesTab" class="panel section hidden">
-          <div class="section-head"><div><h2>週目管理</h2><p>週目由活力人完成旅程後自行進入；後台僅檢視各活力人的目前週目與資料狀態。</p></div><button class="btn primary" data-refresh="cycles" type="button">更新週目</button></div>
-          <div id="cyclesCurrent" class="metrics"></div>
-          <div class="table-wrap"><table><thead><tr><th>週目</th><th>狀態</th><th>期間</th><th>備註</th></tr></thead><tbody id="cyclesBody"></tbody></table></div>
-          <div class="table-wrap"><table><thead><tr><th>活力人</th><th>目前週目</th><th>目前活力組</th><th>狀態</th></tr></thead><tbody id="cyclePlayersBody"></tbody></table></div>
-          <div class="table-wrap"><table><thead><tr><th>活力人</th><th>週目</th><th>歷史活力組</th><th>狀態</th><th>時間</th></tr></thead><tbody id="cycleMembershipsBody"></tbody></table></div>
-          <div class="table-wrap"><table><thead><tr><th>週目</th><th>活力組</th><th>成員</th><th>狀態</th></tr></thead><tbody id="cycleGroupsBody"></tbody></table></div>
-          <div id="cyclesMessage" class="message"></div>
-        </section>
-
-        <section id="prayersTab" class="panel section hidden">
-          <div class="section-head"><div><h2>代禱管理</h2><p>檢視內容、恢復或關閉代禱事項。</p></div><button class="btn primary" data-refresh="prayers" type="button">更新代禱</button></div>
-          <div class="toolbar"><input id="prayerSearch" class="search-input" type="search" placeholder="搜尋標題、內容、發起者"><select id="prayerStatusFilter"><option value="all">全部狀態</option><option value="open">open</option><option value="closed">closed</option></select></div>
-          <div class="table-wrap"><table><thead><tr><th>代禱事項</th><th>發起者</th><th>活力組</th><th>狀態</th><th>可見</th><th>互動</th><th>時間</th><th>操作</th></tr></thead><tbody id="prayersBody"></tbody></table></div>
-          <div class="pagination-actions"><button id="loadMorePrayersBtn" class="btn" type="button">載入更多</button></div>
-          <div id="prayersMessage" class="message"></div>
-        </section>
-
-        <section id="activityLogsTab" class="panel section hidden">
-          <div class="section-head"><div><h2>活動紀錄</h2><p>每次讀取最新 100 筆，較舊資料按需載入；統計只計目前最新頁。</p></div><button class="btn primary" data-refresh="activityLogs" type="button">更新活動紀錄</button></div>
-          <div id="activityAnalysis" class="metrics"></div>
-          <div class="split">
-            <section><h3>常見操作</h3><div id="activityTopActions" class="mini-list"></div></section>
-            <section><h3>常見目標</h3><div id="activityTopTargets" class="mini-list"></div></section>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>動作</th><th>目標</th><th>內容</th><th>時間</th></tr></thead><tbody id="adminLogsBody"></tbody></table></div>
-          <div class="module-toolbar"><button id="loadMoreAdminLogsBtn" class="btn hidden" type="button">載入較舊紀錄</button></div>
-          <div id="activityLogsMessage" class="message"></div>
-        </section>
-
-        <section id="rewardLogsTab" class="panel section hidden">
-          <div class="section-head"><div><h2>積分紀錄</h2><p>每次讀取最新 100 筆，較舊資料按需載入；統計只計目前最新頁。</p></div><button class="btn primary" data-refresh="rewardLogs" type="button">更新積分紀錄</button></div>
-          <div id="rewardAnalysis" class="metrics"></div>
-          <div class="split">
-            <section><h3>活力人熱度</h3><div id="rewardTopPlayers" class="mini-list"></div></section>
-            <section><h3>小組進展</h3><div id="rewardTopGroups" class="mini-list"></div></section>
-          </div>
-          <div class="split">
-            <section><h3>來源分布</h3><div id="rewardSourceBreakdown" class="mini-list"></div></section>
-            <section><h3>近況趨勢</h3><div id="rewardDailyTrend" class="mini-list"></div></section>
-          </div>
-          <div class="table-wrap"><table><thead><tr><th>活力人</th><th>來源</th><th>分數</th><th>時間</th></tr></thead><tbody id="rewardLogsBody"></tbody></table></div>
-          <div class="module-toolbar"><button id="loadMoreRewardLogsBtn" class="btn hidden" type="button">載入較舊紀錄</button></div>
-          <div id="rewardLogsMessage" class="message"></div>
-        </section>
-
-        <section id="chestsTab" class="panel section hidden">
-          <div class="section-head"><div><h2>寶箱設定</h2><p>設定週目寶箱名稱、獎勵方式、獎勵說明與小組點數。</p></div><button class="btn primary" data-refresh="chests" type="button">更新寶箱</button></div>
-          <div id="chestsList" class="settings-grid"></div>
-          <div class="module-subsection">
-            <div class="section-head"><div><h3>其他獎勵發放</h3><p>發放紀錄獨立分頁載入，預設只讀取待發放項目。</p></div></div>
-            <div class="toolbar">
-              <select id="chestRewardClaimFilter"><option value="PENDING">待發放</option><option value="ALL">全部紀錄</option><option value="FULFILLED">已發放</option><option value="UNCLAIMED">尚未申請</option></select>
-              <button id="refreshChestClaimsBtn" class="btn" type="button">更新發放紀錄</button>
-            </div>
-            <div class="table-wrap module-table-wrap"><table>
-              <thead><tr><th>活力人</th><th>寶箱／獎勵</th><th>取得時間</th><th>狀態</th><th>處理</th></tr></thead>
-              <tbody id="chestRewardClaimsBody"></tbody>
-            </table></div>
-            <div class="module-toolbar"><button id="loadMoreChestClaimsBtn" class="btn hidden" type="button">載入較舊紀錄</button></div>
-          </div>
-          <div id="chestsMessage" class="message"></div>
-        </section>
-
-        <section id="systemAnnouncementsTab" class="panel section hidden">
-          <div class="section-head">
-            <div><h2>系統公告</h2><p>管理所有使用者都會收到的系統公告；與小組公告分開儲存。</p></div>
-            <div class="toolbar">
-              <button id="newSystemAnnouncementBtn" class="btn green" type="button">新增公告</button>
-              <button class="btn primary" data-refresh="systemAnnouncements" type="button">更新公告</button>
-            </div>
-          </div>
-
-          <form id="systemAnnouncementForm" class="module-form">
-            <input id="systemAnnouncementId" type="hidden">
-            <div class="module-form-grid">
-              <label class="field full">公告標題<input id="systemAnnouncementTitle" type="text" maxlength="100" placeholder="輸入公告標題"></label>
-              <label class="field full">公告內容<textarea id="systemAnnouncementContent" maxlength="5000" placeholder="輸入完整公告內容"></textarea></label>
-              <label class="field">顯示開始時間<input id="systemAnnouncementStartAt" type="datetime-local"></label>
-              <label class="field">顯示結束時間<input id="systemAnnouncementEndAt" type="datetime-local"></label>
-              <label class="field">狀態<select id="systemAnnouncementStatus"><option value="draft">草稿</option><option value="active">啟用</option><option value="inactive">停用</option></select></label>
-            </div>
-            <div class="module-toolbar">
-              <button class="btn primary" type="submit">儲存公告</button>
-              <button id="cancelSystemAnnouncementEditBtn" class="btn" type="button">取消編輯</button>
-            </div>
-          </form>
-
-          <div class="table-wrap module-table-wrap">
-            <table>
-              <thead><tr><th>公告</th><th>顯示期間</th><th>狀態</th><th>版本</th><th>最後修改</th><th>操作</th></tr></thead>
-              <tbody id="systemAnnouncementsBody"></tbody>
-            </table>
-          </div>
-          <div id="systemAnnouncementsMessage" class="message"></div>
-        </section>
-
-        <section id="specialTasksTab" class="panel section hidden">
-          <div class="section-head">
-            <div><h2>特殊任務</h2><p>管理任務、CSV 完成者名單、同組完成資格與獎勵發送。</p></div>
-            <div class="toolbar">
-              <button id="newSpecialTaskBtn" class="btn green" type="button">新增任務</button>
-              <button class="btn primary" data-refresh="specialTasks" type="button">更新任務</button>
-            </div>
-          </div>
-
-          <form id="specialTaskForm" class="module-form">
-            <input id="specialTaskId" type="hidden">
-            <div class="module-form-grid">
-              <label class="field full">任務名稱<input id="specialTaskName" type="text" maxlength="100" placeholder="輸入任務名稱"></label>
-              <label class="field full">任務說明<textarea id="specialTaskDescription" maxlength="5000" placeholder="輸入完整任務說明"></textarea></label>
-              <label class="field">顯示開始時間<input id="specialTaskStartAt" type="datetime-local"></label>
-              <label class="field">顯示結束時間<input id="specialTaskEndAt" type="datetime-local"></label>
-              <label class="field">獎勵類型<select id="specialTaskRewardType"><option value="groupPoints">小組點數</option><option value="other">其他獎勵</option></select></label>
-              <label id="specialTaskPointsField" class="field">小組點數<input id="specialTaskGroupBonusPoints" type="number" min="0" max="999999" step="1" value="0"></label>
-              <label id="specialTaskRewardDescriptionField" class="field full hidden">其他獎勵說明<textarea id="specialTaskRewardDescription" maxlength="1000" placeholder="輸入其他獎勵內容"></textarea></label>
-              <label class="field">狀態<select id="specialTaskStatus"><option value="draft">草稿</option><option value="active">啟用</option><option value="inactive">停用</option></select></label>
-            </div>
-            <div class="module-toolbar">
-              <button class="btn primary" type="submit">儲存任務</button>
-              <button id="cancelSpecialTaskEditBtn" class="btn" type="button">取消編輯</button>
-            </div>
-          </form>
-
-          <div class="table-wrap module-table-wrap">
-            <table>
-              <thead><tr><th>任務</th><th>獎勵</th><th>顯示期間</th><th>狀態</th><th>完成／資格／獎勵處理</th><th>版本</th><th>最後修改</th><th>操作</th></tr></thead>
-              <tbody id="specialTasksBody"></tbody>
-            </table>
-          </div>
-
-          <section id="specialTaskWorkspace" class="module-workspace hidden">
-            <div class="section-head">
-              <div><h3 id="specialTaskWorkspaceTitle">任務完成者管理</h3><p id="specialTaskWorkspaceMeta"></p></div>
-              <button id="closeSpecialTaskWorkspaceBtn" class="btn" type="button">關閉</button>
-            </div>
-
-            <div class="module-subsection">
-              <h3>CSV 完成者名單</h3>
-              <p class="inline-note">固定標題列：照顧區,大區,真實姓名。系統會依這三欄找到使用者，並自動確認同一活力組的所有有效成員是否都在得獎名單中；選擇檔案後只進行預覽，不會立即寫入正式資料。</p>
-              <div class="module-toolbar">
-                <button id="downloadSpecialTaskCsvTemplateBtn" class="btn" type="button">下載 CSV 範本</button>
-                <label class="file-field btn primary">選擇 CSV<input id="specialTaskCsvFile" type="file" accept=".csv,text/csv"></label>
-                <button id="clearSpecialTaskCsvPreviewBtn" class="btn" type="button">清除預覽</button>
-                <button id="confirmSpecialTaskCsvBtn" class="btn green" type="button" disabled>確認匯入</button>
-              </div>
-              <pre id="specialTaskCsvRawPreview" class="csv-raw-preview hidden"></pre>
-              <div id="specialTaskCsvStats" class="module-stats hidden"></div>
-              <div id="specialTaskCsvPreviewWrap" class="table-wrap module-table-wrap hidden">
-                <table>
-                  <thead><tr><th>列</th><th>照顧區</th><th>大區</th><th>真實姓名</th><th>系統活力組</th><th>比對狀態</th><th>原因</th></tr></thead>
-                  <tbody id="specialTaskCsvPreviewBody"></tbody>
-                </table>
-              </div>
-            </div>
-
-            <div class="module-subsection">
-              <div class="section-head">
-                <div><h3>完成與獎勵結果</h3><p>資格以確認 CSV 當下的同組快照為準；發獎時依 rewardKey 防止重複發送。</p></div>
-                <div class="toolbar">
-                  <button id="refreshSpecialTaskResultsBtn" class="btn" type="button">更新結果</button>
-                  <button id="sendSpecialTaskRewardsBtn" class="btn amber" type="button">發送獎勵</button>
-                </div>
-              </div>
-              <div id="specialTaskResultStats" class="module-stats"></div>
-              <div id="specialTaskGroupStatsWrap" class="table-wrap module-table-wrap">
-                <table>
-                  <thead><tr><th>活力組</th><th>完成者</th><th>符合資格</th><th>獎勵處理</th><th>失敗</th></tr></thead>
-                  <tbody id="specialTaskGroupStatsBody"></tbody>
-                </table>
-              </div>
-              <div class="table-wrap module-table-wrap">
-                <table>
-                  <thead><tr><th>完成者</th><th>照顧區／大區</th><th>活力組</th><th>完成資格</th><th>獎勵狀態</th><th>發送時間／錯誤</th><th>操作</th></tr></thead>
-                  <tbody id="specialTaskResultsBody"></tbody>
-                </table>
-              </div>
-              <div id="specialTaskSendResult" class="message"></div>
-            </div>
-          </section>
-
-          <div id="specialTasksMessage" class="message"></div>
-        </section>
-
-        <section id="migrationTab" class="panel section hidden">
-          <div class="section-head">
-            <div>
-              <h2>資料升級</h2>
-              <p>背景準備期間玩家可正常使用；只有按下「開始最後切換」後，才會短暫暫停登入與資料寫入。背景自動處理最多 60 分鐘，最後切換最多 10 分鐘。</p>
-            </div>
-            <button class="btn primary" data-refresh="migration" type="button">更新狀態</button>
-          </div>
-          <div class="module-subsection">
-            <div class="section-head">
-              <div>
-                <h3>本版安全資料整理</h3>
-                <p>先預覽影響範圍；正式執行前自動備份，並以分批方式處理。一般使用者不會觸發此流程。</p>
-              </div>
-              <div class="toolbar">
-                <button id="previewFix12DataRepairsBtn" class="btn" type="button">預覽影響範圍</button>
-                <button id="runFix12DataRepairBatchBtn" class="btn amber" type="button">執行下一批</button>
-              </div>
-            </div>
-            <div class="migration-status-grid">
-              <article class="mini-item"><small>整理狀態</small><strong id="fix12OverallRepairStatus">讀取中</strong></article>
-              <article class="mini-item"><small>小組公告整理</small><strong id="fix12GroupPostsRepairStatus">讀取中</strong></article>
-              <article class="mini-item"><small>共同任務足跡回填</small><strong id="fix12GroupTasksRepairStatus">讀取中</strong></article>
-              <article class="mini-item"><small>備份與進度</small><strong id="fix12BackupProgressStatus">讀取中</strong></article>
-            </div>
-            <div id="fix12DataRepairsMessage" class="message"></div>
-          </div>
-          <div id="v0131MaintenanceStatusGrid" class="migration-status-grid">
-            <article class="mini-item"><small>玩家使用狀態</small><strong id="migrationPlayerAccess">讀取中</strong></article>
-            <article class="mini-item"><small>資料升級狀態</small><strong id="v0131MigrationStatus">讀取中</strong></article>
-            <article class="mini-item"><small>目前處理階段</small><strong id="migrationPhaseChinese">讀取中</strong></article>
-            <article class="mini-item"><small>背景自動處理</small><strong id="migrationAutoRun">讀取中</strong></article>
-            <article class="mini-item"><small>背景處理次數</small><strong id="migrationRunWindow">0／0</strong></article>
-            <article class="mini-item"><small>最後切換</small><strong id="migrationFinalizationWindow">尚未開始</strong></article>
-            <article class="mini-item"><small>資料讀取方式</small><strong id="archiveRoutingMode">讀取中</strong></article>
-            <article class="mini-item"><small>封存資料庫</small><strong id="archiveSetStatus">讀取中</strong></article>
-            <article class="mini-item"><small>背景處理程序</small><strong id="maintenanceWorkerStatus">讀取中</strong></article>
-            <article class="mini-item"><small>目前背景工作</small><strong id="maintenanceWorkerSubtask">讀取中</strong></article>
-          </div>
-          <article id="v0131MigrationErrorCard" class="mini-item migration-error hidden">
-            <strong>資料升級錯誤</strong>
-            <small id="v0131MigrationLastError"></small>
-          </article>
-          <div class="toolbar">
-            <button id="runV0131MigrationBtn" class="btn amber" type="button">開始背景資料準備</button>
-            <button id="resumeV0131MigrationBtn" class="btn" type="button" disabled>繼續背景資料準備</button>
-            <button id="pauseV0131MigrationBtn" class="btn red" type="button" disabled>暫停並恢復玩家使用</button>
-            <button id="finalizeV0131MigrationBtn" class="btn green" type="button" disabled>開始最後切換</button>
-            <button id="verifyV0131MigrationBtn" class="btn primary" type="button" disabled>完成後再核對</button>
-            <button id="resetV0132MigrationBtn" class="btn danger" type="button" disabled>重設未寫入的預檢</button>
-          </div>
-          <small class="inline-note">「開始背景資料準備」不會封鎖玩家。背景準備完成後，系統會停止並等待管理員確認；不會自行進入最後切換。</small>
-          <pre id="v0131MigrationDetails" class="csv-raw-preview"></pre>
-          <div id="v0131MigrationMessage" class="message"></div>
-          <hr>
-          <div class="section-head">
-            <div>
-              <h2>日常資料整理與歷史封存</h2>
-              <p>近期常用資料保留在主要資料庫；較舊明細完成封存與核對後，才依設定時間清理。</p>
-            </div>
-          </div>
-          <div class="migration-status-grid">
-            <article class="mini-item"><small>封存資料庫狀態</small><strong id="archiveSpreadsheetStatus">讀取中</strong></article>
-            <article class="mini-item"><small>目前階段</small><strong id="archiveStage">尚無批次</strong></article>
-            <article class="mini-item"><small>待封存／待清理</small><strong id="archivePendingCounts">0／0</strong></article>
-            <article class="mini-item"><small>已完成／失敗</small><strong id="archiveCompletedCounts">0／0</strong></article>
-            <article class="mini-item"><small>已封存／已清理筆數</small><strong id="archiveRecordCounts">0／0</strong></article>
-            <article class="mini-item"><small>待清理筆數</small><strong id="archivePendingCleanupRecords">0</strong></article>
-            <article class="mini-item"><small>處理進度</small><strong id="archiveCheckpoint">—</strong></article>
-            <article class="mini-item"><small>最早清理時間</small><strong id="archiveCleanupNotBefore">—</strong></article>
-            <article class="mini-item"><small>即時彙整最後成功</small><strong id="hotAggregationLastSuccess">尚無紀錄</strong></article>
-            <article class="mini-item"><small>每週封存最後執行</small><strong id="weeklyArchiveLastRun">尚無紀錄</strong></article>
-            <article class="mini-item"><small>延後清理最後執行</small><strong id="archiveCleanupLastRun">尚無紀錄</strong></article>
-            <article class="mini-item"><small>下一次預定執行</small><strong id="maintenanceNextSchedule">—</strong></article>
-            <article class="mini-item"><small>每日核對</small><strong id="dailyReconciliationStatus">尚未執行</strong></article>
-            <article class="mini-item"><small>最後錯誤</small><strong id="archiveLastError">—</strong></article>
-          </div>
-          <div class="toolbar">
-            <input id="archiveBatchIdInput" class="search-input" type="search" placeholder="輸入封存批次編號；留空使用最新批次">
-            <button id="runDailyReconciliationBtn" class="btn green" type="button">重新執行每日核對</button>
-            <button id="runWeeklyArchiveBtn" class="btn amber" type="button">重新執行每週封存</button>
-            <button id="runArchiveCleanupBtn" class="btn primary" type="button">重新執行延後清理</button>
-            <button id="verifyLatestArchiveBtn" class="btn" type="button">核對指定封存批次</button>
-            <button id="viewArchiveManifestBtn" class="btn" type="button">查看指定封存批次</button>
-            <button id="resumeFailedArchiveBtn" class="btn amber" type="button">繼續失敗的封存工作</button>
-            <button id="ensureMaintenanceTriggersBtn" class="btn" type="button">建立／修復排程</button>
-          </div>
-          <pre id="archiveManifestDetail" class="csv-raw-preview hidden"></pre>
-          <div id="archiveMaintenanceMessage" class="message"></div>
-        </section>
-
-        <section id="settingsTab" class="panel section hidden">
-          <div class="section-head">
-            <div>
-              <h2>系統設定</h2>
-              <p>此頁只顯示已登記、已接入系統的設定。名稱與積分會同步至既有使用者頁面；不會修改使用者頁面的版面或操作流程。</p>
-            </div>
-            <div class="toolbar">
-              <button id="normalizeSettingsBtn" class="btn amber" type="button">整理重複與無效設定</button>
-              <button class="btn primary" data-refresh="settings" type="button">更新設定</button>
-            </div>
-          </div>
-          <form id="adminPasswordForm" class="settings-grid" autocomplete="off">
-            <article class="setting-row">
-              <div>
-                <strong>管理者密碼</strong>
-                <small>使用 salt + SHA-256 儲存；修改後會讓既有後台登入狀態失效。</small>
-              </div>
-              <label class="field">目前密碼<input id="currentAdminPassword" type="password" autocomplete="current-password"></label>
-              <label class="field">新密碼<input id="newAdminPassword" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="8 至 64 碼"></label>
-              <label class="field">確認新密碼<input id="confirmAdminPassword" type="password" minlength="8" maxlength="64" autocomplete="new-password"></label>
-              <button class="btn primary" type="submit">更新管理者密碼</button>
-            </article>
-          </form>
-          <div id="settingsHealth" class="setting-health"></div>
-          <div id="settingsList" class="settings-grid"></div>
-          <div id="settingsMessage" class="message"></div>
-        </section>
-      </div>
-    </section>
-  </main>
-
-  <div id="loading" class="loading hidden"><div class="loading-card"><div class="spinner"></div><span id="loadingText">處理中...</span></div></div>
-  <script src="runtime-settings.js?v=20260728-btest-rc5"></script>
-  <script src="server-client.js?v=20260727-v01321-fix12-rc4"></script>
-  <script src="admin.js?v=20260727-v01321-fix12-rc4"></script>
-</body>
-</html>
+.loading {
+  position:fixed;
+  inset:0;
+  z-index:50;
+  display:grid;
+  place-items:center;
+  background:rgba(31,45,58,.28);
+  backdrop-filter:blur(3px)
+}
+.loading-card {
+  min-width:220px;
+  padding:18px;
+  border-radius:14px;
+  background:#fff;
+  border:1px solid var(--line);
+  box-shadow:var(--shadow);
+  display:grid;
+  justify-items:center;
+  gap:12px;
+  font-weight:850
+}
+.spinner {
+  width:30px;
+  height:30px;
+  border:4px solid #e4edf2;
+  border-top-color:var(--brand);
+  border-radius:50%;
+  animation:spin .8s linear infinite
+}
+@keyframes spin {
+  to {
+    transform:rotate(360deg)
+  }
+}
+@media(max-width:980px) {
+  .layout {
+    grid-template-columns:1fr
+  }
+  .sidebar {
+    position:static;
+    grid-template-columns:repeat(3,1fr)
+  }
+  .metrics {
+    grid-template-columns:repeat(2,1fr)
+  }
+  .split,.tool-form {
+    grid-template-columns:1fr
+  }
+}
+@media(max-width:620px) {
+  .shell {
+    padding:12px
+  }
+  .topbar,.section-head {
+    display:grid
+  }
+  .sidebar {
+    grid-template-columns:1fr 1fr
+  }
+  .metrics {
+    grid-template-columns:1fr
+  }
+  .migration-status-grid {
+    grid-template-columns:1fr
+  }
+  .setting-row {
+    grid-template-columns:1fr
+  }
+  .search-input {
+    width:100%
+  }
+  .toolbar .btn {
+    flex:1
+  }
+}
