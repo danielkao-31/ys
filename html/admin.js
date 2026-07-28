@@ -1284,6 +1284,9 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
 
     function saveSpecialTask(event){
       event.preventDefault();
+      const requestStartedAt = window.performance && typeof window.performance.now === 'function'
+        ? window.performance.now()
+        : Date.now();
 
       const payload = {
         taskId:$('#specialTaskId').value.trim(),
@@ -1327,7 +1330,15 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
 
         notifyUserAppInstances_('specialTaskChanged');
         resetSpecialTaskForm();
-        showMessage('#specialTasksMessage',res.data.message || '特殊任務已儲存','success');
+        const requestCompletedAt = window.performance && typeof window.performance.now === 'function'
+          ? window.performance.now()
+          : Date.now();
+        const elapsedSeconds = Math.max(0,(requestCompletedAt - requestStartedAt) / 1000);
+        const serverTiming = res.data && res.data.performance ? res.data.performance : null;
+        const timingText = serverTiming && Number.isFinite(Number(serverTiming.totalMs))
+          ? '（總計 ' + elapsedSeconds.toFixed(1) + ' 秒；後端 ' + (Number(serverTiming.totalMs) / 1000).toFixed(1) + ' 秒）'
+          : '（總計 ' + elapsedSeconds.toFixed(1) + ' 秒）';
+        showMessage('#specialTasksMessage',(res.data.message || '特殊任務已儲存') + timingText,'success');
       }).catch((err) => showMessage('#specialTasksMessage',errorMessage(err),'error'))
         .finally(() => setLoading(false));
     }
