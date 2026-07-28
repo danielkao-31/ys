@@ -32,11 +32,18 @@
 
   function getApiUrl_(action) {
     const config = global.APP_RUNTIME_CONFIG || {};
-    return String(
-      isAdminAction_(action)
-        ? config.adminGasWebAppUrl
-        : config.gasWebAppUrl
-    ).trim();
+    const publicUrl = String(config.gasWebAppUrl || '').trim();
+
+    if (!isAdminAction_(action)) {
+      return publicUrl;
+    }
+
+    const adminUrl = String(config.adminGasWebAppUrl || '').trim();
+    if (adminUrl) {
+      return adminUrl;
+    }
+
+    return config.allowSharedAdminEndpoint === true ? publicUrl : '';
   }
 
   function validateApiUrl_(url, action) {
@@ -52,7 +59,11 @@
       const config = global.APP_RUNTIME_CONFIG || {};
       const publicUrl = String(config.gasWebAppUrl || '').trim();
 
-      if (publicUrl && url === publicUrl) {
+      if (
+        publicUrl &&
+        url === publicUrl &&
+        config.allowSharedAdminEndpoint !== true
+      ) {
         throw new Error('管理 API 必須使用獨立的受限制 GAS Web App /exec 網址');
       }
     }
@@ -268,7 +279,7 @@
       return JSON.parse(result.text);
     } catch (error) {
       throw new Error(isAdminAction_(action)
-        ? '管理後端回傳格式錯誤。請確認受限制的管理 GAS Web App 已重新部署，且目前 Google 帳號具備存取權限。'
+        ? '管理後端回傳格式錯誤。請確認目前 GAS Web App 已重新部署，並使用完整的 /exec 網址。'
         : '使用者後端回傳格式錯誤。請確認公開 GAS Web App 已重新部署，且使用的是完整 /exec 網址。');
     }
   }

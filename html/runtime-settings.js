@@ -7,6 +7,8 @@
 window.APP_RUNTIME_CONFIG = Object.freeze({
   gasWebAppUrl: 'https://script.google.com/macros/s/AKfycbwP3NSPi1CXfUeaMkLj_bvae3kQgCrP0-8QYfrA4EmWAemTqMIBJxrjGzcBG2uDjPOI/exec',
   adminGasWebAppUrl: '',
+  allowSharedAdminEndpoint: true,
+  adminPasswordlessTestMode: true,
   expectedApiContractVersion: '1.1.0',
-  assetVersion: '20260728-v01321-fix12-rc13'
+  assetVersion: '20260728-v01321-fix12-rc13-admin-dev2'
 });
