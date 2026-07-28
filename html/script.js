@@ -181,6 +181,62 @@ const STORAGE_KEY = 'yct_current_player';
     return !incomingWeekKey || !currentWeekKey || incomingWeekKey === currentWeekKey;
   }
 
+  function applyCompletedTaskPlayerSnapshot_(kind, result) {
+    result = result || {};
+    const incoming = result.player || null;
+    const current = state.currentPlayer || null;
+
+    if (!incoming || !current) {
+      return false;
+    }
+
+    const incomingPlayerId = String(incoming.playerId || '').trim();
+    const currentPlayerId = String(current.playerId || '').trim();
+    if (!incomingPlayerId || incomingPlayerId !== currentPlayerId) {
+      return false;
+    }
+
+    const incomingCycleId = String(incoming.currentCycleId || '').trim();
+    const currentCycleId = String(
+      state.currentCycleId || current.currentCycleId || ''
+    ).trim();
+    if (incomingCycleId && currentCycleId && incomingCycleId !== currentCycleId) {
+      return false;
+    }
+
+    const incomingGroupId = String(incoming.groupId || '').trim();
+    const currentGroupId = String(current.groupId || '').trim();
+    if (incomingGroupId !== currentGroupId) {
+      return false;
+    }
+
+    const nextPlayer = Object.assign({}, current, {
+      totalScore: Math.max(
+        Number(current.totalScore || 0),
+        Number(incoming.totalScore || 0)
+      ),
+      updatedAt: incoming.updatedAt || current.updatedAt || ''
+    });
+
+    if (kind === 'DAILY') {
+      nextPlayer.dailyStreak = Number(incoming.dailyStreak || 0);
+      nextPlayer.lastDailyFullDate = String(incoming.lastDailyFullDate || '');
+    }
+
+    state.currentPlayer = nextPlayer;
+    persistCurrentPlayer();
+    renderPlayer(nextPlayer);
+
+    if (state.groupJourney) {
+      state.groupJourney = Object.assign({}, state.groupJourney, {
+        myContributionScore: Number(nextPlayer.totalScore || 0)
+      });
+      renderGroupJourney(state.groupJourney);
+    }
+
+    return true;
+  }
+
   function applyCompletedTaskWriteResult_(kind, result) {
     result = result || {};
     if (kind === 'DAILY' && result.record &&
@@ -208,6 +264,7 @@ const STORAGE_KEY = 'yct_current_player';
     if (kind === 'MEETING') invalidateByRule_('meetingPracticeChanged');
     renderDailyStatus();
     renderWeeklyTaskStatus();
+    applyCompletedTaskPlayerSnapshot_(kind, result);
     applyRewardSummaryToHome(result.rewardSummary);
     checkHomeSyncState_();
   }
