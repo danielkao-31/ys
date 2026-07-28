@@ -10,5 +10,5 @@ window.APP_RUNTIME_CONFIG = Object.freeze({
   allowSharedAdminEndpoint: true,
   adminPasswordlessTestMode: true,
   expectedApiContractVersion: '1.1.0',
-  assetVersion: '20260728-v01321-fix12-rc13-admin-dev2'
+  assetVersion: '20260728-v01321-fix12-rc13-admin-dev3'
 });

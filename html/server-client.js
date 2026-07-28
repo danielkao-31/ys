@@ -135,7 +135,7 @@
       method: 'GET',
       redirect: 'follow',
       cache: 'no-store',
-      credentials: url === getApiUrl_('adminLogin') ? 'include' : 'omit'
+      credentials: 'omit'
     };
 
     if (controller) {
@@ -178,6 +178,10 @@
 
         if (timedOut || (error && error.name === 'AbortError')) {
           throw createTimeoutError_();
+        }
+
+        if (error && (error.name === 'TypeError' || /failed to fetch/i.test(String(error.message || '')))) {
+          throw new Error('無法連線到 GAS Web App。請確認前端使用的是目前部署中的 /exec 網址。');
         }
 
         throw error;
@@ -229,7 +233,7 @@
       }),
       redirect: 'follow',
       cache: 'no-store',
-      credentials: isAdminAction_(action) ? 'include' : 'omit'
+      credentials: 'omit'
     };
 
     if (controller) {
@@ -262,6 +266,10 @@
     } catch (error) {
       if (timedOut || (error && error.name === 'AbortError')) {
         throw createTimeoutError_();
+      }
+
+      if (error && (error.name === 'TypeError' || /failed to fetch/i.test(String(error.message || '')))) {
+        throw new Error('無法連線到 GAS Web App。請確認前端使用的是目前部署中的 /exec 網址。');
       }
 
       throw error;
