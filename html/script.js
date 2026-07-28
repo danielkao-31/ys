@@ -5,7 +5,7 @@ const STORAGE_KEY = 'yct_current_player';
   const ASSET_BASE_URL = '..';
   const REMOTE_AVATAR_BASE_URL =
     'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const ASSET_VERSION = '20260728-v01321-fix12-rc8';
+  const ASSET_VERSION = '20260728-v01321-fix12-rc9';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -4539,7 +4539,6 @@ const STORAGE_KEY = 'yct_current_player';
     $('#practiceModalHeading').textContent = config.title;
     $('#practiceModalDescription').textContent = config.description;
     $('#practiceModalReward').textContent = config.reward;
-    $('#practiceNote').value = String((state.dailyRecord || {}).note || '');
 
     $('#practiceSubmitBtn').textContent = done
       ? '今日已完成'
@@ -4572,14 +4571,8 @@ const STORAGE_KEY = 'yct_current_player';
       morningRevival: toBool(record.morningRevival),
       bibleReading: toBool(record.bibleReading),
       prayer: toBool(record.prayer),
-      bookPursuit: toBool(record.bookPursuit),
-      note: $('#practiceNote').value.trim()
+      bookPursuit: toBool(record.bookPursuit)
     };
-
-    if (payload.note.length > 500) {
-      setResultMessage('#practiceModalMessage', '備註不可超過 500 個字');
-      return;
-    }
 
     payload[config.field] = true;
     const pendingDaily = beginPendingMutationRequest_('daily-practice', payload);
@@ -4653,9 +4646,6 @@ const STORAGE_KEY = 'yct_current_player';
         '<span>完成：' +
           escapeHtml(labels.join('、') || '尚無項目') +
         '</span>',
-        record.note
-          ? '<span>備註：' + escapeHtml(record.note) + '</span>'
-          : '',
         '</article>'
       ].join('');
     }).join('');
@@ -4735,7 +4725,6 @@ const STORAGE_KEY = 'yct_current_player';
     $('#weeklyTaskModalHeading').textContent = config.title;
     $('#weeklyTaskModalDescription').textContent = config.description;
     $('#weeklyTaskModalReward').textContent = config.reward;
-    $('#weeklyTaskNote').value = String((state.weeklyTaskRecord || {}).note || '');
 
     $('#weeklyTaskSubmitBtn').textContent = done
       ? '本週已完成'
@@ -4768,14 +4757,8 @@ const STORAGE_KEY = 'yct_current_player';
       outreachVisit: toBool(record.outreachVisit),
       smallGroup: toBool(record.smallGroup),
       prayerMeeting: toBool(record.prayerMeeting),
-      lordDayMeeting: toBool(record.lordDayMeeting),
-      note: $('#weeklyTaskNote').value.trim()
+      lordDayMeeting: toBool(record.lordDayMeeting)
     };
-
-    if (payload.note.length > 500) {
-      setResultMessage('#weeklyTaskModalMessage', '備註不可超過 500 個字');
-      return;
-    }
 
     payload[config.field] = true;
     const pendingMeeting = beginPendingMutationRequest_('meeting-practice', payload);
@@ -4849,9 +4832,6 @@ const STORAGE_KEY = 'yct_current_player';
         '<span>完成：' +
           escapeHtml(labels.join('、') || '尚無項目') +
         '</span>',
-        record.note
-          ? '<span>備註：' + escapeHtml(record.note) + '</span>'
-          : '',
         '</article>'
       ].join('');
     }).join('');
@@ -6357,7 +6337,6 @@ function clearPrayerAutoScroll(selector) {
           row.prayerCompleted ? '✅ 禱告' : '▫️ 禱告', '　',
           row.readingCompleted ? '✅ 書報' : '▫️ 書報', '</p>',
           '<strong>當日 ', formatNumber(row.dailyScore || 0), ' 點</strong>',
-          row.noteSummary ? '<p>' + escapeHtml(row.noteSummary) + '</p>' : '',
           '</section>'
         ].join(''));
       });
