@@ -1225,9 +1225,7 @@ button.player-stat-card{
 }
 
 #messageCenterModal{
-  align-items:center;
-    justify-content:center;
-    padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+  padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
 }
 
 .message-center-card{
@@ -2424,11 +2422,6 @@ body[data-theme="night"] .auth-hero{
     line-height:1;
 }
 
-#homeView .home-hero-card>div:nth-of-type(2){
-  width:62%;
-    z-index:2;
-}
-
 .game-stage-task:before{
   content:"★";
     position:absolute;
@@ -3060,10 +3053,6 @@ body[data-theme="night"] .auth-hero{
     grid-template-columns:repeat(2,minmax(0,1fr));
   }
 
-  .modal-layer{
-    align-items:center;
-  }
-
   .bottom-nav{
     border-radius:20px 20px 0 0;
   }
@@ -3436,10 +3425,10 @@ body[data-theme="night"] .auth-hero{
     inset:0;
     z-index:100;
     display:flex;
-    align-items:flex-end;
+    align-items:center;
     justify-content:center;
     animation:modal-bg .18s ease both;
-    padding:10px max(10px, env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom));
+    padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));
     background:rgba(63,57,49,.54);
     backdrop-filter:blur(5px);
 }
@@ -5499,9 +5488,9 @@ body{
   display:flex;
     align-items:center;
     justify-content:center;
-    min-width:96px;
-    min-height:48px;
-    padding:0 16px;
+    min-width:54px;
+    min-height:30px;
+    padding:0 10px;
     white-space:nowrap;
 }
 
@@ -5562,9 +5551,9 @@ body{
   }
 
   #prayerView #prayerCarousel .prayer-inline-line span:last-child{
-    min-width:92px;
-        min-height:46px;
-        padding:0 14px;
+    min-width:52px;
+        min-height:30px;
+        padding:0 8px;
   }
 }
 
@@ -6252,7 +6241,6 @@ body{
 
 #chestDetailModal{
   z-index:140;
-    align-items:center;
     padding:16px;
     background:rgba(63,57,49,.68);
 }
