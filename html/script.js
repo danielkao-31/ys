@@ -5,7 +5,7 @@ const STORAGE_KEY = 'yct_current_player';
   const ASSET_BASE_URL = '..';
   const REMOTE_AVATAR_BASE_URL =
     'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const ASSET_VERSION = '20260728-v01321-fix12-rc13-admin-dev3';
+  const ASSET_VERSION = '20260728-v01321-fix12-rc13';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -86,6 +86,7 @@ const STORAGE_KEY = 'yct_current_player';
     'deleteGroupPost',
     'submitDailyPractice',
     'submitMeetingPractice',
+    'processTaskWriteEvent',
     'searchPrayerRequests',
     'createPrayerRequest',
     'getPrayerRequestDetail',
@@ -152,13 +153,101 @@ const STORAGE_KEY = 'yct_current_player';
       clientSeconds.toFixed(1) + ' 秒；後端 ' +
       backendSeconds.toFixed(1) + ' 秒' + stageText + '）';
   }
+  function formatTaskQueueAcceptedMessage_(performance, clientStartedAt) {
+    const base = formatTaskPerformanceMessage_(performance, clientStartedAt);
+    return base.replace('任務已儲存（', '任務已儲存，點數同步中（');
+  }
+
+  function mergeCompletedTaskRecord_(currentRecord, incomingRecord, fields) {
+    const current = currentRecord || {};
+    const incoming = incomingRecord || {};
+    const merged = Object.assign({}, current, incoming);
+    fields.forEach((field) => {
+      merged[field] = toBool(current[field]) || toBool(incoming[field]);
+    });
+    return merged;
+  }
+
+  function shouldApplyCompletedTaskRecord_(kind, record) {
+    record = record || {};
+    if (kind === 'DAILY') {
+      const recordDate = String(record.recordDate || '').trim();
+      return !recordDate || recordDate === getTaipeiBusinessDate_();
+    }
+    const incomingWeekKey = String(record.weekKey || '').trim();
+    const currentWeekKey = String(
+      state.weeklyTaskRecord && state.weeklyTaskRecord.weekKey || getTaipeiIsoWeekKey_()
+    ).trim();
+    return !incomingWeekKey || !currentWeekKey || incomingWeekKey === currentWeekKey;
+  }
+
+  function applyCompletedTaskWriteResult_(kind, result) {
+    result = result || {};
+    if (kind === 'DAILY' && result.record &&
+        shouldApplyCompletedTaskRecord_(kind, result.record)) {
+      state.dailyRecord = mergeCompletedTaskRecord_(
+        state.dailyRecord,
+        result.record,
+        ['morningRevival', 'bibleReading', 'prayer', 'bookPursuit']
+      );
+    }
+    if (kind === 'MEETING' && result.record &&
+        shouldApplyCompletedTaskRecord_(kind, result.record)) {
+      state.weeklyTaskRecord = mergeCompletedTaskRecord_(
+        state.weeklyTaskRecord,
+        result.record,
+        ['smallGroup', 'prayerMeeting', 'lordDayMeeting', 'outreachVisit']
+      );
+    }
+
+    /*
+     * 背景事件保存的是接受當時的玩家快照；完成回應不得覆蓋目前登入者、
+     * 換組或晉級後的新狀態。玩家與旅程資料由輕量同步版本重新取得。
+     */
+    if (kind === 'DAILY') invalidateByRule_('dailyPracticeChanged');
+    if (kind === 'MEETING') invalidateByRule_('meetingPracticeChanged');
+    renderDailyStatus();
+    renderWeeklyTaskStatus();
+    applyRewardSummaryToHome(result.rewardSummary);
+    checkHomeSyncState_();
+  }
+
+  function continueTaskWriteProcessing_(eventId, kind) {
+    eventId = String(eventId || '');
+    if (!eventId || state.taskWriteSyncInFlight[eventId]) return;
+    state.taskWriteSyncInFlight[eventId] = true;
+    callServer('processTaskWriteEvent', { eventId })
+      .then((res) => {
+        const data = res && res.data || {};
+        if (isSuccess(res) && String(data.status || '') === 'COMPLETED' && data.result) {
+          applyCompletedTaskWriteResult_(kind, data.result);
+          const detail = TASK_PERFORMANCE_PROBE_ENABLED && data.result.performance
+            ? '（後端同步 ' + (Number(data.result.performance.totalMilliseconds || 0) / 1000).toFixed(1) + ' 秒）'
+            : '';
+          setResultMessage('#homeMessage', '任務與點數已同步' + detail, true);
+          return;
+        }
+        if (String(data.status || '') === 'FAILED') {
+          setResultMessage('#homeMessage', String(data.error || '任務已儲存，但點數同步需要管理者檢查。'), false);
+          return;
+        }
+        setResultMessage('#homeMessage', '任務已儲存，點數將由系統自動同步。', true);
+      })
+      .catch(() => {
+        setResultMessage('#homeMessage', '任務已儲存，點數將由系統自動同步。', true);
+      })
+      .finally(() => {
+        delete state.taskWriteSyncInFlight[eventId];
+      });
+  }
+
   const STALE_REQUEST_ERROR_CODE = 'STALE_REQUEST';
   const SERVER_MUTATION_APIS = new Set([
     'loginPlayer', 'registerPlayer', 'logoutPlayer', 'updatePlayerAvatar', 'markPlayerMessageRead',
     'suppressPlayerMessageToday', 'updateMyAccount', 'updateMyPassword',
     'createVitalGroup', 'joinVitalGroupByInviteCode', 'switchPrimaryVitalGroup',
     'transferVitalGroupOwnership', 'leaveVitalGroup', 'createGroupPost', 'updateGroupPost', 'deleteGroupPost',
-    'submitDailyPractice', 'submitMeetingPractice', 'createPrayerRequest',
+    'submitDailyPractice', 'submitMeetingPractice', 'processTaskWriteEvent', 'createPrayerRequest',
     'respondPrayerRequest', 'updatePrayerRequest', 'closePrayerRequest',
     'claimPlayerChestReward', 'advancePlayerCycle'
   ]);
@@ -350,6 +439,7 @@ const STORAGE_KEY = 'yct_current_player';
     selectedWeeklyTaskType: '',
     pendingDailyRequestId: '',
     pendingWeeklyRequestId: '',
+    taskWriteSyncInFlight: {},
     pendingPrayerResponseRequestIds: {},
     pendingGroupCreateRequestId: '',
     pendingGroupCreateSignature: '',
@@ -449,6 +539,21 @@ const STORAGE_KEY = 'yct_current_player';
     return new Date(
       Date.now() + TAIPEI_UTC_OFFSET_MS
     ).toISOString().slice(0, 10);
+  }
+
+  function getTaipeiIsoWeekKey_() {
+    const taipeiNow = new Date(Date.now() + TAIPEI_UTC_OFFSET_MS);
+    const date = new Date(Date.UTC(
+      taipeiNow.getUTCFullYear(),
+      taipeiNow.getUTCMonth(),
+      taipeiNow.getUTCDate()
+    ));
+    const dayNumber = date.getUTCDay() || 7;
+    date.setUTCDate(date.getUTCDate() + 4 - dayNumber);
+    const isoYear = date.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+    const isoWeek = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+    return isoYear + '-W' + String(isoWeek).padStart(2, '0');
   }
 
   function getMillisecondsUntilNextTaipeiMidnight_() {
@@ -4611,6 +4716,7 @@ const STORAGE_KEY = 'yct_current_player';
     };
 
     payload[config.field] = true;
+    payload.clientMutationPeriodKey = getTaipeiBusinessDate_();
     const pendingDaily = beginPendingMutationRequest_('daily-practice', payload);
     state.pendingDailyRequestId = pendingDaily.requestId;
     payload.requestId = pendingDaily.requestId;
@@ -4629,25 +4735,27 @@ const STORAGE_KEY = 'yct_current_player';
           return;
         }
 
-        state.dailyRecord = res.data.record || state.dailyRecord;
+        if (shouldApplyCompletedTaskRecord_('DAILY', res.data.record)) {
+          state.dailyRecord = mergeCompletedTaskRecord_(
+            state.dailyRecord,
+            res.data.record,
+            ['morningRevival', 'bibleReading', 'prayer', 'bookPursuit']
+          );
+        }
         settlePendingMutationRequest_('daily-practice', payload.requestId, res);
         state.pendingDailyRequestId = '';
         invalidateByRule_('dailyPracticeChanged');
-
-        if (res.data.player) {
-          state.currentPlayer = res.data.player;
-          persistCurrentPlayer();
-        }
-
-        renderPlayer(state.currentPlayer);
         renderDailyStatus();
-        applyRewardSummaryToHome(res.data.rewardSummary);
-        const performanceMessage = formatTaskPerformanceMessage_(
-          res.data.performance,
-          taskRequestStartedAt
-        );
+        const performanceMessage = res.data.processingPending
+          ? formatTaskQueueAcceptedMessage_(res.data.performance, taskRequestStartedAt)
+          : formatTaskPerformanceMessage_(res.data.performance, taskRequestStartedAt);
         closeModal('practiceModal');
         setResultMessage('#homeMessage', performanceMessage, true);
+        if (res.data.processingPending && res.data.eventId) {
+          continueTaskWriteProcessing_(res.data.eventId, 'DAILY');
+        } else {
+          applyRewardSummaryToHome(res.data.rewardSummary);
+        }
       })
       .catch((error) => {
         setResultMessage('#practiceModalMessage', getErrorMessage(error));
@@ -4804,6 +4912,9 @@ const STORAGE_KEY = 'yct_current_player';
     };
 
     payload[config.field] = true;
+    payload.clientMutationPeriodKey = String(
+      state.weeklyTaskRecord && state.weeklyTaskRecord.weekKey || getTaipeiIsoWeekKey_()
+    );
     const pendingMeeting = beginPendingMutationRequest_('meeting-practice', payload);
     state.pendingWeeklyRequestId = pendingMeeting.requestId;
     payload.requestId = pendingMeeting.requestId;
@@ -4822,25 +4933,27 @@ const STORAGE_KEY = 'yct_current_player';
           return;
         }
 
-        state.weeklyTaskRecord = res.data.record || state.weeklyTaskRecord;
+        if (shouldApplyCompletedTaskRecord_('MEETING', res.data.record)) {
+          state.weeklyTaskRecord = mergeCompletedTaskRecord_(
+            state.weeklyTaskRecord,
+            res.data.record,
+            ['smallGroup', 'prayerMeeting', 'lordDayMeeting', 'outreachVisit']
+          );
+        }
         settlePendingMutationRequest_('meeting-practice', payload.requestId, res);
         state.pendingWeeklyRequestId = '';
         invalidateByRule_('meetingPracticeChanged');
-
-        if (res.data.player) {
-          state.currentPlayer = res.data.player;
-          persistCurrentPlayer();
-        }
-
-        renderPlayer(state.currentPlayer);
         renderWeeklyTaskStatus();
-        applyRewardSummaryToHome(res.data.rewardSummary);
-        const performanceMessage = formatTaskPerformanceMessage_(
-          res.data.performance,
-          taskRequestStartedAt
-        );
+        const performanceMessage = res.data.processingPending
+          ? formatTaskQueueAcceptedMessage_(res.data.performance, taskRequestStartedAt)
+          : formatTaskPerformanceMessage_(res.data.performance, taskRequestStartedAt);
         closeModal('weeklyTaskModal');
         setResultMessage('#homeMessage', performanceMessage, true);
+        if (res.data.processingPending && res.data.eventId) {
+          continueTaskWriteProcessing_(res.data.eventId, 'MEETING');
+        } else {
+          applyRewardSummaryToHome(res.data.rewardSummary);
+        }
       })
       .catch((error) => {
         setResultMessage('#weeklyTaskModalMessage', getErrorMessage(error));

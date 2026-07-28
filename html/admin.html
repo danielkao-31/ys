@@ -13,7 +13,7 @@
   <meta name="application-name" content="高雄青職｜活力同行">
   <meta name="theme-color" content="#8fd3ff">
   <title>高雄青職｜活力同行</title>
-  <link rel="stylesheet" href="admin.css?v=20260728-v01321-fix12-rc13-admin-dev3">
+  <link rel="stylesheet" href="admin.css?v=20260728-v01321-fix12-rc10">
 </head>
 <body>
   <main class="shell">
@@ -23,9 +23,17 @@
     </header>
 
     <section id="loginView" class="panel login-card">
-      <h2>正在進入測試後台</h2>
-      <p>目前為 B 級測試模式，系統會自動建立管理 Session，不需輸入密碼。</p>
-      <div id="loginMessage" class="message">正在建立測試管理 Session...</div>
+      <h2>管理者登入</h2>
+      <label class="field">管理者登入密碼<input
+        id="adminPasswordInput"
+        name="admin-login-password-input"
+        type="password"
+        autocomplete="new-password"
+        readonly
+        placeholder="輸入管理者密碼"
+      ></label>
+      <button id="loginBtn" class="btn primary" type="button">登入</button>
+      <div id="loginMessage" class="message">請使用管理者密碼登入。首次遷移後請到設定頁更新密碼。</div>
     </section>
 
     <section id="appView" class="layout hidden">
@@ -378,14 +386,18 @@
               <button class="btn primary" data-refresh="settings" type="button">更新設定</button>
             </div>
           </div>
-          <div class="settings-grid">
+          <form id="adminPasswordForm" class="settings-grid" autocomplete="off">
             <article class="setting-row">
               <div>
-                <strong>管理登入模式</strong>
-                <small>目前為 B 級測試用免密碼模式。正式候選部署前必須關閉測試旗標並恢復管理登入驗收。</small>
+                <strong>管理者密碼</strong>
+                <small>使用 salt + SHA-256 儲存；修改後會讓既有後台登入狀態失效。</small>
               </div>
+              <label class="field">目前密碼<input id="currentAdminPassword" type="password" autocomplete="current-password"></label>
+              <label class="field">新密碼<input id="newAdminPassword" type="password" minlength="8" maxlength="64" autocomplete="new-password" placeholder="8 至 64 碼"></label>
+              <label class="field">確認新密碼<input id="confirmAdminPassword" type="password" minlength="8" maxlength="64" autocomplete="new-password"></label>
+              <button class="btn primary" type="submit">更新管理者密碼</button>
             </article>
-          </div>
+          </form>
           <div id="settingsHealth" class="setting-health"></div>
           <div id="settingsList" class="settings-grid"></div>
           <div id="settingsMessage" class="message"></div>
@@ -395,8 +407,8 @@
   </main>
 
   <div id="loading" class="loading hidden"><div class="loading-card"><div class="spinner"></div><span id="loadingText">處理中...</span></div></div>
-  <script src="runtime-settings.js?v=20260728-v01321-fix12-rc13-admin-dev3"></script>
-  <script src="server-client.js?v=20260728-v01321-fix12-rc13-admin-dev3"></script>
-  <script src="admin.js?v=20260728-v01321-fix12-rc13-admin-dev3"></script>
+  <script src="runtime-settings.js?v=20260728-v01321-fix12-two-stage2"></script>
+  <script src="server-client.js?v=20260728-v01321-fix12-rc10"></script>
+  <script src="admin.js?v=20260728-v01321-fix12-rc11"></script>
 </body>
 </html>

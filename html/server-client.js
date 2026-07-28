@@ -32,18 +32,11 @@
 
   function getApiUrl_(action) {
     const config = global.APP_RUNTIME_CONFIG || {};
-    const publicUrl = String(config.gasWebAppUrl || '').trim();
-
-    if (!isAdminAction_(action)) {
-      return publicUrl;
-    }
-
-    const adminUrl = String(config.adminGasWebAppUrl || '').trim();
-    if (adminUrl) {
-      return adminUrl;
-    }
-
-    return config.allowSharedAdminEndpoint === true ? publicUrl : '';
+    return String(
+      isAdminAction_(action)
+        ? config.adminGasWebAppUrl
+        : config.gasWebAppUrl
+    ).trim();
   }
 
   function validateApiUrl_(url, action) {
@@ -59,11 +52,7 @@
       const config = global.APP_RUNTIME_CONFIG || {};
       const publicUrl = String(config.gasWebAppUrl || '').trim();
 
-      if (
-        publicUrl &&
-        url === publicUrl &&
-        config.allowSharedAdminEndpoint !== true
-      ) {
+      if (publicUrl && url === publicUrl) {
         throw new Error('管理 API 必須使用獨立的受限制 GAS Web App /exec 網址');
       }
     }
@@ -135,7 +124,7 @@
       method: 'GET',
       redirect: 'follow',
       cache: 'no-store',
-      credentials: 'omit'
+      credentials: url === getApiUrl_('adminLogin') ? 'include' : 'omit'
     };
 
     if (controller) {
@@ -178,10 +167,6 @@
 
         if (timedOut || (error && error.name === 'AbortError')) {
           throw createTimeoutError_();
-        }
-
-        if (error && (error.name === 'TypeError' || /failed to fetch/i.test(String(error.message || '')))) {
-          throw new Error('無法連線到 GAS Web App。請確認前端使用的是目前部署中的 /exec 網址。');
         }
 
         throw error;
@@ -233,7 +218,7 @@
       }),
       redirect: 'follow',
       cache: 'no-store',
-      credentials: 'omit'
+      credentials: isAdminAction_(action) ? 'include' : 'omit'
     };
 
     if (controller) {
@@ -268,10 +253,6 @@
         throw createTimeoutError_();
       }
 
-      if (error && (error.name === 'TypeError' || /failed to fetch/i.test(String(error.message || '')))) {
-        throw new Error('無法連線到 GAS Web App。請確認前端使用的是目前部署中的 /exec 網址。');
-      }
-
       throw error;
     } finally {
       if (timeoutId) {
@@ -287,7 +268,7 @@
       return JSON.parse(result.text);
     } catch (error) {
       throw new Error(isAdminAction_(action)
-        ? '管理後端回傳格式錯誤。請確認目前 GAS Web App 已重新部署，並使用完整的 /exec 網址。'
+        ? '管理後端回傳格式錯誤。請確認受限制的管理 GAS Web App 已重新部署，且目前 Google 帳號具備存取權限。'
         : '使用者後端回傳格式錯誤。請確認公開 GAS Web App 已重新部署，且使用的是完整 /exec 網址。');
     }
   }

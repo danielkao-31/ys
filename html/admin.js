@@ -1,8 +1,4 @@
 const ADMIN_STORAGE_KEY = 'yct_admin_token';
-    const ADMIN_PASSWORDLESS_TEST_MODE = !!(
-      window.APP_RUNTIME_CONFIG &&
-      window.APP_RUNTIME_CONFIG.adminPasswordlessTestMode === true
-    );
     const state = {token:'',tab:'overview',loadingDepth:0,players:[],groups:[],groupPosts:[],groupPostNextPageToken:'',groupPostHasMore:false,cycles:[],playerCycles:[],cycleMemberships:[],cycleGroups:[],currentCycle:null,prayers:[],prayerNextPageToken:'',prayerHasMore:false,adminLogs:[],rewardLogs:[],adminLogNextPageToken:'',rewardLogNextPageToken:'',groupRewardLogNextPageToken:'',adminLogHasMore:false,rewardLogHasMore:false,groupRewardLogHasMore:false,activityAnalysis:null,rewardAnalysis:null,chests:[],chestClaims:[],chestClaimNextPageToken:'',chestClaimHasMore:false,systemAnnouncements:[],specialTasks:[],selectedSpecialTaskId:'',specialTaskResults:null,specialTaskCsvText:'',specialTaskCsvPreview:null,migration:null,fix12Repairs:null,archiveMaintenance:null,settings:[],settingsHealth:null};
     const $ = (s) => document.querySelector(s);
     const $$ = (s) => [...document.querySelectorAll(s)];
@@ -29,11 +25,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       }catch(error){}
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-      initializeAdminLoginFieldProtection_();
-      bindEvents();
-      restoreSession();
-    });
+    document.addEventListener('DOMContentLoaded', () => { initializeAdminLoginFieldProtection_(); bindEvents(); restoreSession(); });
 
     function clearLockedAdminLoginField_(){
       const field = $('#adminPasswordInput');
@@ -72,10 +64,8 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
     }
 
     function bindEvents(){
-      const loginButton = $('#loginBtn');
-      const passwordField = $('#adminPasswordInput');
-      if(loginButton) loginButton.addEventListener('click', login);
-      if(passwordField) passwordField.addEventListener('keydown', (e) => { if(e.key === 'Enter') login(); });
+      $('#loginBtn').addEventListener('click', login);
+      $('#adminPasswordInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') login(); });
       $('#logoutBtn').addEventListener('click', () => logout());
       $$('.tab-btn').forEach((b) => b.addEventListener('click', () => switchTab(b.dataset.tab)));
       $$('[data-refresh]').forEach((b) => b.addEventListener('click', () => loadTab(b.dataset.refresh, true)));
@@ -139,8 +129,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       });
       $('#settingsList').addEventListener('click', handleSettingAction);
       $('#normalizeSettingsBtn').addEventListener('click', normalizeManagedSettings);
-      const adminPasswordForm = $('#adminPasswordForm');
-      if(adminPasswordForm) adminPasswordForm.addEventListener('submit', updateAdminPassword);
+      $('#adminPasswordForm').addEventListener('submit', updateAdminPassword);
     }
 
     function restoreSession(){
@@ -149,16 +138,10 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         token = sessionStorage.getItem(ADMIN_STORAGE_KEY) || '';
         localStorage.removeItem(ADMIN_STORAGE_KEY);
       }catch(ignored){}
-
-      if(token){
-        state.token = token;
-        showApp();
-        switchTab('overview');
-        return;
-      }
-
-      showLogin();
-      if(ADMIN_PASSWORDLESS_TEST_MODE) login();
+      if(!token) return showLogin();
+      state.token = token;
+      showApp();
+      switchTab('overview');
     }
 
     function showLogin(){
@@ -167,34 +150,21 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       $('#loginView').classList.remove('hidden');
       $('#appView').classList.add('hidden');
       $('#logoutBtn').classList.add('hidden');
-      if(ADMIN_PASSWORDLESS_TEST_MODE){
-        showMessage('#loginMessage','正在建立測試管理 Session...','');
-      }
     }
 
     function showApp(){
       $('#loginView').classList.add('hidden');
       $('#appView').classList.remove('hidden');
-      $('#logoutBtn').classList.toggle('hidden',ADMIN_PASSWORDLESS_TEST_MODE);
+      $('#logoutBtn').classList.remove('hidden');
     }
 
     function login(){
-      const passwordField = $('#adminPasswordInput');
-      const password = ADMIN_PASSWORDLESS_TEST_MODE
-        ? ''
-        : String(passwordField && passwordField.value || '').trim();
+      const password = $('#adminPasswordInput').value.trim();
+      if(!password) return showMessage('#loginMessage','請輸入管理者登入密碼','error');
 
-      if(!ADMIN_PASSWORDLESS_TEST_MODE && !password){
-        showMessage('#loginMessage','請輸入管理者登入密碼','error');
-        return;
-      }
-
-      setLoading(true,ADMIN_PASSWORDLESS_TEST_MODE ? '進入測試後台...' : '登入中...');
+      setLoading(true,'登入中...');
       callServer('adminLogin', password).then((res) => {
-        if(!isSuccess(res)){
-          showMessage('#loginMessage', responseError(res,'登入失敗'),'error');
-          return;
-        }
+        if(!isSuccess(res)) return showMessage('#loginMessage', responseError(res,'登入失敗'),'error');
 
         state.token = res.data.adminToken || '';
         lockAndClearAdminLoginField_();
@@ -202,15 +172,13 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         localStorage.removeItem(ADMIN_STORAGE_KEY);
         showMessage(
           '#loginMessage',
-          ADMIN_PASSWORDLESS_TEST_MODE ? '測試模式已自動登入' :
-            (res.data.mustChangePassword
-              ? '登入成功。請到設定頁更新管理者密碼。'
-              : '登入成功'),
+          res.data.mustChangePassword
+            ? '登入成功。請到設定頁更新管理者密碼。'
+            : '登入成功',
           'success'
         );
         showApp();
-
-        if (!ADMIN_PASSWORDLESS_TEST_MODE && res.data.mustChangePassword) {
+        if (res.data.mustChangePassword) {
           state.tab = 'settings';
           $$('.tab-btn').forEach((b) => {
             b.classList.toggle('active', b.dataset.tab === 'settings');
@@ -233,9 +201,6 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       $('#loading').classList.add('hidden');
       showLogin();
       if(message) showMessage('#loginMessage',message,'error');
-      if(ADMIN_PASSWORDLESS_TEST_MODE){
-        window.setTimeout(login,100);
-      }
     }
 
     function switchTab(tab){
