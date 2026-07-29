@@ -5,7 +5,7 @@ const STORAGE_KEY = 'yct_current_player';
   const ASSET_BASE_URL = '..';
   const REMOTE_AVATAR_BASE_URL =
     'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const ASSET_VERSION = '20260729-v01321-fix12-two-stage5';
+  const ASSET_VERSION = '20260729-v01321-fix12-two-stage7';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -158,6 +158,168 @@ const STORAGE_KEY = 'yct_current_player';
     return base.replace('任務已儲存（', '任務已儲存，點數同步中（');
   }
 
+  function getOfficialHomeScoreSnapshot_() {
+    return {
+      personalPoints: Math.max(0, Number(
+        state.currentPlayer && state.currentPlayer.totalScore || 0
+      )),
+      groupPoints: state.homeGroupEnabled === false
+        ? 0
+        : Math.max(0, Number(
+            state.groupJourney && state.groupJourney.totalScore || 0
+          ))
+    };
+  }
+
+  function normalizeTaskScorePreviewDelta_(delta) {
+    delta = delta || {};
+    return {
+      personalPoints: Math.max(0, Number(delta.personalPoints || 0)),
+      groupPoints: Math.max(0, Number(delta.groupPoints || 0)),
+      selectedTaskField: String(delta.selectedTaskField || '').trim(),
+      source: String(delta.source || '').trim()
+    };
+  }
+
+  function getPendingTaskScorePreviewTotals_() {
+    return Object.keys(state.pendingTaskScorePreviews || {}).reduce(
+      (totals, previewKey) => {
+        const preview = normalizeTaskScorePreviewDelta_(
+          state.pendingTaskScorePreviews[previewKey]
+        );
+        totals.personalPoints += preview.personalPoints;
+        totals.groupPoints += preview.groupPoints;
+        return totals;
+      },
+      { personalPoints: 0, groupPoints: 0 }
+    );
+  }
+
+  function renderPendingTaskScorePreview_() {
+    const official = getOfficialHomeScoreSnapshot_();
+    const pending = getPendingTaskScorePreviewTotals_();
+    const baseline = state.pendingTaskScoreBaseline || {
+      personalPoints: official.personalPoints,
+      groupPoints: official.groupPoints
+    };
+    const hasPending = Object.keys(state.pendingTaskScorePreviews || {}).length > 0;
+    const contributionValue = hasPending
+      ? Math.max(
+          official.personalPoints,
+          Number(baseline.personalPoints || 0) + pending.personalPoints
+        )
+      : official.personalPoints;
+    const groupValue = state.homeGroupEnabled === false
+      ? 0
+      : (hasPending
+          ? Math.max(
+              official.groupPoints,
+              Number(baseline.groupPoints || 0) + pending.groupPoints
+            )
+          : official.groupPoints);
+
+    const contributionText = $('#homeContributionText');
+    const groupText = $('#homeGroupScoreText');
+    if (contributionText) contributionText.textContent = formatNumber(contributionValue);
+    if (groupText) groupText.textContent = formatNumber(groupValue);
+
+    const contributionBadge = $('#homeContributionSyncText');
+    if (contributionBadge) {
+      contributionBadge.hidden = pending.personalPoints <= 0;
+      contributionBadge.textContent = pending.personalPoints > 0
+        ? '+' + formatNumber(pending.personalPoints) + ' 待確認・同步中'
+        : '';
+    }
+
+    const groupBadge = $('#homeGroupSyncText');
+    if (groupBadge) {
+      const visibleGroupPending = state.homeGroupEnabled !== false
+        ? pending.groupPoints
+        : 0;
+      groupBadge.hidden = visibleGroupPending <= 0;
+      groupBadge.textContent = visibleGroupPending > 0
+        ? '+' + formatNumber(visibleGroupPending) + ' 待確認・同步中'
+        : '';
+    }
+  }
+
+  function beginPendingTaskScorePreview_(previewKey, delta) {
+    previewKey = String(previewKey || '').trim();
+    const normalized = normalizeTaskScorePreviewDelta_(delta);
+    if (!previewKey || (!normalized.personalPoints && !normalized.groupPoints)) return;
+
+    const currentKeys = Object.keys(state.pendingTaskScorePreviews || {});
+    if (!currentKeys.length) {
+      const official = getOfficialHomeScoreSnapshot_();
+      state.pendingTaskScoreBaseline = {
+        personalPoints: official.personalPoints,
+        groupPoints: official.groupPoints
+      };
+    }
+    state.pendingTaskScorePreviews[previewKey] = normalized;
+    renderPendingTaskScorePreview_();
+  }
+
+  function replacePendingTaskScorePreview_(oldKey, newKey, delta) {
+    oldKey = String(oldKey || '').trim();
+    newKey = String(newKey || '').trim();
+    if (oldKey) delete state.pendingTaskScorePreviews[oldKey];
+
+    const normalized = normalizeTaskScorePreviewDelta_(delta);
+    if (newKey && (normalized.personalPoints || normalized.groupPoints)) {
+      state.pendingTaskScorePreviews[newKey] = normalized;
+    }
+    if (!Object.keys(state.pendingTaskScorePreviews).length) {
+      const official = getOfficialHomeScoreSnapshot_();
+      state.pendingTaskScoreBaseline = {
+        personalPoints: official.personalPoints,
+        groupPoints: official.groupPoints
+      };
+    }
+    renderPendingTaskScorePreview_();
+  }
+
+  function removePendingTaskScorePreview_(previewKey, deferRender) {
+    previewKey = String(previewKey || '').trim();
+    if (previewKey) delete state.pendingTaskScorePreviews[previewKey];
+    if (!deferRender) rebasePendingTaskScorePreview_();
+  }
+
+  function rebasePendingTaskScorePreview_() {
+    const official = getOfficialHomeScoreSnapshot_();
+    state.pendingTaskScoreBaseline = {
+      personalPoints: official.personalPoints,
+      groupPoints: official.groupPoints
+    };
+    renderPendingTaskScorePreview_();
+  }
+
+  function clearPendingTaskScorePreviews_() {
+    state.pendingTaskScorePreviews = {};
+    const official = getOfficialHomeScoreSnapshot_();
+    state.pendingTaskScoreBaseline = {
+      personalPoints: official.personalPoints,
+      groupPoints: official.groupPoints
+    };
+    renderPendingTaskScorePreview_();
+  }
+
+  function buildClientTaskScorePreview_(kind, taskType) {
+    const config = kind === 'DAILY'
+      ? PRACTICE_CONFIG[taskType]
+      : WEEKLY_TASK_CONFIG[taskType];
+    const points = Math.max(0, Number(config && config.score || 0));
+    const cooperative = kind === 'DAILY'
+      ? taskType === 'morning'
+      : taskType === 'outreachVisit';
+    return {
+      personalPoints: cooperative ? 0 : points,
+      groupPoints: points,
+      selectedTaskField: String(config && config.field || ''),
+      source: 'LOADED_TASK_CONFIG'
+    };
+  }
+
   function mergeCompletedTaskRecord_(currentRecord, incomingRecord, fields) {
     const current = currentRecord || {};
     const incoming = incomingRecord || {};
@@ -237,6 +399,38 @@ const STORAGE_KEY = 'yct_current_player';
     return true;
   }
 
+  function applyCompletedTaskOfficialScores_(result) {
+    result = result || {};
+    const scores = result.officialScores || null;
+    const player = state.currentPlayer || null;
+    if (!scores || !player) return false;
+
+    const currentPlayerId = String(player.playerId || '').trim();
+    const currentGroupId = String(player.groupId || '').trim();
+    const currentCycleId = String(
+      state.currentCycleId || player.currentCycleId || ''
+    ).trim();
+    if (String(scores.playerId || '').trim() !== currentPlayerId) return false;
+    if (String(scores.groupId || '').trim() !== currentGroupId) return false;
+    if (String(scores.cycleId || '').trim() && currentCycleId &&
+        String(scores.cycleId || '').trim() !== currentCycleId) return false;
+
+    state.currentPlayer = Object.assign({}, player, {
+      totalScore: Math.max(0, Number(scores.personalPoints || 0))
+    });
+    persistCurrentPlayer();
+
+    if (state.groupJourney) {
+      state.groupJourney = Object.assign({}, state.groupJourney, {
+        totalScore: Math.max(0, Number(scores.groupPoints || 0)),
+        myContributionScore: Math.max(0, Number(scores.personalPoints || 0))
+      });
+    }
+    renderPlayer(state.currentPlayer);
+    if (state.groupJourney) renderGroupJourney(state.groupJourney);
+    return true;
+  }
+
   function applyCompletedTaskWriteResult_(kind, result) {
     result = result || {};
     if (kind === 'DAILY' && result.record &&
@@ -264,12 +458,15 @@ const STORAGE_KEY = 'yct_current_player';
     if (kind === 'MEETING') invalidateByRule_('meetingPracticeChanged');
     renderDailyStatus();
     renderWeeklyTaskStatus();
-    applyCompletedTaskPlayerSnapshot_(kind, result);
-    applyRewardSummaryToHome(result.rewardSummary);
+    const officialScoresApplied = applyCompletedTaskOfficialScores_(result);
+    if (!officialScoresApplied) {
+      applyCompletedTaskPlayerSnapshot_(kind, result);
+      applyRewardSummaryToHome(result.rewardSummary);
+    }
     checkHomeSyncState_();
   }
 
-  const TASK_WRITE_SYNC_RETRY_DELAYS_MS = [0, 1200, 2000, 3000, 5000];
+  const TASK_WRITE_SYNC_RETRY_DELAYS_MS = [0, 1200, 2000, 3000, 5000, 8000, 13000, 20000];
 
   function finishTaskWriteSyncTracking_(eventId) {
     const tracking = state.taskWriteSyncInFlight[eventId];
@@ -296,8 +493,14 @@ const STORAGE_KEY = 'yct_current_player';
       callServer('processTaskWriteEvent', { eventId })
         .then((res) => {
           const data = res && res.data || {};
+          if (data.optimisticDelta) {
+            replacePendingTaskScorePreview_(eventId, eventId, data.optimisticDelta);
+          }
+
           if (isSuccess(res) && String(data.status || '') === 'COMPLETED' && data.result) {
+            removePendingTaskScorePreview_(eventId, true);
             applyCompletedTaskWriteResult_(kind, data.result);
+            rebasePendingTaskScorePreview_();
             notifyOtherAppInstances_('taskWriteCompleted');
             const detail = TASK_PERFORMANCE_PROBE_ENABLED && data.result.performance
               ? '（後端同步 ' + (Number(data.result.performance.totalMilliseconds || 0) / 1000).toFixed(1) + ' 秒）'
@@ -308,6 +511,7 @@ const STORAGE_KEY = 'yct_current_player';
           }
 
           if (String(data.status || '') === 'FAILED') {
+            removePendingTaskScorePreview_(eventId);
             setResultMessage(
               '#homeMessage',
               String(data.error || '任務已儲存，但點數同步需要管理者檢查。'),
@@ -447,6 +651,7 @@ const STORAGE_KEY = 'yct_current_player';
       config.description = String(source.description || '').trim();
 
       const score = Math.max(0, Number(source.score || 0));
+      config.score = score;
       config.reward = String(source.reward || '').trim() ||
         (
           type === 'morning'
@@ -463,6 +668,7 @@ const STORAGE_KEY = 'yct_current_player';
       config.description = String(source.description || '').trim();
 
       const score = Math.max(0, Number(source.score || 0));
+      config.score = score;
       config.reward = String(source.reward || '').trim() ||
         (
           type === 'outreachVisit'
@@ -549,6 +755,11 @@ const STORAGE_KEY = 'yct_current_player';
     pendingDailyRequestId: '',
     pendingWeeklyRequestId: '',
     taskWriteSyncInFlight: {},
+    pendingTaskScorePreviews: {},
+    pendingTaskScoreBaseline: {
+      personalPoints: 0,
+      groupPoints: 0
+    },
     pendingPrayerResponseRequestIds: {},
     pendingGroupCreateRequestId: '',
     pendingGroupCreateSignature: '',
@@ -3694,14 +3905,12 @@ const STORAGE_KEY = 'yct_current_player';
 
     $('#heroGreetingText').textContent = '';
 
-    $('#homeContributionText').textContent = formatNumber(contribution);
-
-
     $('#myPlayerName').textContent = displayName;
     $('#myGroupName').textContent = buildHandbookAffiliationText(player);
 
     $('#homeStreakText').textContent =
       Number(player.dailyStreak || 0) + ' 天';
+    renderPendingTaskScorePreview_();
     renderHomeChestSummary(state.chestSummary || createEmptyChestSummary());
 
     renderAvatar(player);
@@ -4584,6 +4793,7 @@ const STORAGE_KEY = 'yct_current_player';
 
       const disabledGroupScore = $('#homeGroupScoreText');
       if (disabledGroupScore) disabledGroupScore.textContent = '0';
+      renderPendingTaskScorePreview_();
 
       $('#homeJourneyProgressText').textContent = '0%';
       $('#homeJourneyNextText').textContent =
@@ -4630,6 +4840,7 @@ const STORAGE_KEY = 'yct_current_player';
     if (homeGroupScore) {
       homeGroupScore.textContent = formatNumber(totalScore);
     }
+    renderPendingTaskScorePreview_();
 
     $('#homeJourneyProgressText').textContent =
       Math.max(0, Number(journey.progressPercent || 0)) +
@@ -4825,10 +5036,16 @@ const STORAGE_KEY = 'yct_current_player';
     };
 
     payload[config.field] = true;
+    payload.selectedTaskField = config.field;
     payload.clientMutationPeriodKey = getTaipeiBusinessDate_();
     const pendingDaily = beginPendingMutationRequest_('daily-practice', payload);
     state.pendingDailyRequestId = pendingDaily.requestId;
     payload.requestId = pendingDaily.requestId;
+    const localPreviewKey = 'LOCAL_DAILY::' + payload.requestId;
+    beginPendingTaskScorePreview_(
+      localPreviewKey,
+      buildClientTaskScorePreview_('DAILY', state.selectedPracticeType)
+    );
 
     const taskRequestStartedAt = Date.now();
     setLoading(true, '儲存今日任務...');
@@ -4836,6 +5053,7 @@ const STORAGE_KEY = 'yct_current_player';
     callServer('submitDailyPractice', payload)
       .then((res) => {
         if (!isSuccess(res)) {
+          removePendingTaskScorePreview_(localPreviewKey);
           settlePendingMutationRequest_('daily-practice', payload.requestId, res);
           setResultMessage(
             '#practiceModalMessage',
@@ -4851,6 +5069,11 @@ const STORAGE_KEY = 'yct_current_player';
             ['morningRevival', 'bibleReading', 'prayer', 'bookPursuit']
           );
         }
+        replacePendingTaskScorePreview_(
+          localPreviewKey,
+          res.data.eventId,
+          res.data.optimisticDelta
+        );
         settlePendingMutationRequest_('daily-practice', payload.requestId, res);
         state.pendingDailyRequestId = '';
         invalidateByRule_('dailyPracticeChanged');
@@ -4863,10 +5086,13 @@ const STORAGE_KEY = 'yct_current_player';
         if (res.data.processingPending && res.data.eventId) {
           continueTaskWriteProcessing_(res.data.eventId, 'DAILY');
         } else {
-          applyRewardSummaryToHome(res.data.rewardSummary);
+          removePendingTaskScorePreview_(res.data.eventId || localPreviewKey, true);
+          applyCompletedTaskWriteResult_('DAILY', res.data);
+          rebasePendingTaskScorePreview_();
         }
       })
       .catch((error) => {
+        removePendingTaskScorePreview_(localPreviewKey);
         setResultMessage('#practiceModalMessage', getErrorMessage(error));
       })
       .finally(() => {
@@ -5021,12 +5247,18 @@ const STORAGE_KEY = 'yct_current_player';
     };
 
     payload[config.field] = true;
+    payload.selectedTaskField = config.field;
     payload.clientMutationPeriodKey = String(
       state.weeklyTaskRecord && state.weeklyTaskRecord.weekKey || getTaipeiIsoWeekKey_()
     );
     const pendingMeeting = beginPendingMutationRequest_('meeting-practice', payload);
     state.pendingWeeklyRequestId = pendingMeeting.requestId;
     payload.requestId = pendingMeeting.requestId;
+    const localPreviewKey = 'LOCAL_MEETING::' + payload.requestId;
+    beginPendingTaskScorePreview_(
+      localPreviewKey,
+      buildClientTaskScorePreview_('MEETING', state.selectedWeeklyTaskType)
+    );
 
     const taskRequestStartedAt = Date.now();
     setLoading(true, '儲存本週任務...');
@@ -5034,6 +5266,7 @@ const STORAGE_KEY = 'yct_current_player';
     callServer('submitMeetingPractice', payload)
       .then((res) => {
         if (!isSuccess(res)) {
+          removePendingTaskScorePreview_(localPreviewKey);
           settlePendingMutationRequest_('meeting-practice', payload.requestId, res);
           setResultMessage(
             '#weeklyTaskModalMessage',
@@ -5049,6 +5282,11 @@ const STORAGE_KEY = 'yct_current_player';
             ['smallGroup', 'prayerMeeting', 'lordDayMeeting', 'outreachVisit']
           );
         }
+        replacePendingTaskScorePreview_(
+          localPreviewKey,
+          res.data.eventId,
+          res.data.optimisticDelta
+        );
         settlePendingMutationRequest_('meeting-practice', payload.requestId, res);
         state.pendingWeeklyRequestId = '';
         invalidateByRule_('meetingPracticeChanged');
@@ -5061,10 +5299,13 @@ const STORAGE_KEY = 'yct_current_player';
         if (res.data.processingPending && res.data.eventId) {
           continueTaskWriteProcessing_(res.data.eventId, 'MEETING');
         } else {
-          applyRewardSummaryToHome(res.data.rewardSummary);
+          removePendingTaskScorePreview_(res.data.eventId || localPreviewKey, true);
+          applyCompletedTaskWriteResult_('MEETING', res.data);
+          rebasePendingTaskScorePreview_();
         }
       })
       .catch((error) => {
+        removePendingTaskScorePreview_(localPreviewKey);
         setResultMessage('#weeklyTaskModalMessage', getErrorMessage(error));
       })
       .finally(() => {
@@ -6689,6 +6930,7 @@ function clearPrayerAutoScroll(selector) {
     if (previousPlayerId && previousPlayerId !== nextPlayerId) {
       clearPendingMutationRequestsForPlayer_(previousPlayerId);
       clearMessageSuppressionRetryForPlayer_(previousPlayerId);
+      clearPendingTaskScorePreviews_();
     }
 
     state.sessionGeneration += 1;
@@ -6749,6 +6991,8 @@ function clearPrayerAutoScroll(selector) {
     state.currentCycleId = '';
     state.pendingDailyRequestId = '';
     state.pendingWeeklyRequestId = '';
+    state.pendingTaskScorePreviews = {};
+    state.pendingTaskScoreBaseline = { personalPoints: 0, groupPoints: 0 };
     state.pendingPrayerResponseRequestIds = {};
     state.pendingGroupCreateRequestId = '';
     state.pendingGroupCreateSignature = '';
