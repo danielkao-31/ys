@@ -3,9 +3,10 @@ const STORAGE_KEY = 'yct_current_player';
   const APP_SYNC_SIGNAL_KEY = 'yct_app_sync_signal';
   const APP_SYNC_CHANNEL_NAME = 'yct_app_sync_v1';
   const ASSET_BASE_URL = '..';
+  const LOCAL_AVATAR_BASE_URL = ASSET_BASE_URL;
   const REMOTE_AVATAR_BASE_URL =
     'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const ASSET_VERSION = '20260729-v01321-fix12-two-stage7';
+  const IMAGE_ASSET_VERSION = '20260728-v01321-assets1';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -799,7 +800,6 @@ const STORAGE_KEY = 'yct_current_player';
   function initApp() {
     initializeLoginFieldProtection_();
     applySavedTheme();
-    preloadCriticalBackgrounds_();
     bindEvents();
     initRegisterAvatar();
     hydrateExistingImages_();
@@ -1139,31 +1139,18 @@ const STORAGE_KEY = 'yct_current_player';
     window.addEventListener('focus', handleAppResume_);
   }
 
-  function preloadCriticalBackgrounds_() {
-    const root = document.documentElement;
-    const backgroundAssets = [
-      ['--asset-bg-mobile', 'appBgMobile'],
-      ['--asset-bg-desktop', 'appBgDesktop'],
-      ['--asset-hero-mobile', 'heroMobile'],
-      ['--asset-hero-desktop', 'heroDesktop'],
-      ['--asset-journey-mobile', 'journeyMobile'],
-      ['--asset-journey-desktop', 'journeyDesktop'],
-      ['--asset-game-camp', 'gameCamp'],
-      ['--asset-game-panel', 'gamePanel'],
-      ['--asset-chest-hero', 'chest01']
-    ];
+  function normalizeManagedImageUrl_(url) {
+    url = String(url || '').trim();
+    if (!url) return '';
 
-    backgroundAssets.forEach(([cssVar, key]) => {
-      loadManagedImage_(key, IMAGE_ASSETS[key])
-        .then((url) => {
-          root.style.setProperty(cssVar, 'url("' + url + '")');
-        })
-        .catch(() => {
-          if (key.indexOf('chest') === 0) {
-            root.style.setProperty(cssVar, 'url("' + IMAGE_FALLBACK_DATA_URL + '")');
-          }
-        });
-    });
+    const avatarMatch = url.match(
+      /\/((?:avatar-male|avatar-female)\/(?:avatar-male|avatar-female)-direct-\d{3}\.png)(?:[?#].*)?$/i
+    );
+    if (avatarMatch) {
+      return ASSET_BASE_URL + '/' + avatarMatch[1];
+    }
+
+    return url;
   }
 
   function hydrateExistingImages_(root) {
@@ -1201,20 +1188,42 @@ const STORAGE_KEY = 'yct_current_player';
     }
 
     options = options || {};
+    url = normalizeManagedImageUrl_(url);
     const fallbackUrl =
       Object.prototype.hasOwnProperty.call(options, 'fallbackUrl')
         ? options.fallbackUrl
         : IMAGE_FALLBACK_DATA_URL;
+    const currentUrl = String(img.dataset.managedLoadedUrl || '').trim();
+
+    if (
+      currentUrl === url &&
+      img.complete &&
+      Number(img.naturalWidth || 0) > 0
+    ) {
+      img.classList.remove('managed-image-loading', 'managed-image-fallback');
+      return Promise.resolve(url);
+    }
+
+    img.decoding = 'async';
+    if (options.priority === 'high') {
+      img.loading = 'eager';
+      try {
+        img.fetchPriority = 'high';
+      } catch (error) {}
+    } else {
+      img.loading = options.loading === 'eager' ? 'eager' : 'lazy';
+    }
 
     img.classList.add('managed-image-loading');
     img.classList.remove('managed-image-fallback');
-    img.removeAttribute('src');
 
     return loadManagedImage_(key || url, url)
       .then((loadedUrl) => {
-        img.src = loadedUrl;
-        img.classList.remove('managed-image-loading');
-        img.classList.remove('managed-image-fallback');
+        if (img.getAttribute('src') !== loadedUrl) {
+          img.src = loadedUrl;
+        }
+        img.dataset.managedLoadedUrl = url;
+        img.classList.remove('managed-image-loading', 'managed-image-fallback');
         return loadedUrl;
       })
       .catch((error) => {
@@ -1229,9 +1238,13 @@ const STORAGE_KEY = 'yct_current_player';
         }
 
         if (fallbackUrl) {
-          img.src = fallbackUrl;
+          if (img.getAttribute('src') !== fallbackUrl) {
+            img.src = fallbackUrl;
+          }
+          img.dataset.managedLoadedUrl = fallbackUrl;
         } else {
           img.removeAttribute('src');
+          delete img.dataset.managedLoadedUrl;
         }
 
         img.classList.remove('managed-image-loading');
@@ -1242,54 +1255,84 @@ const STORAGE_KEY = 'yct_current_player';
       });
   }
 
-  function setAvatarImageSource_(image, placeholder, url, key) {
+  function setAvatarImageSource_(image, placeholder, url, key, fallbackUrl) {
     if (!image || !placeholder) {
       return;
     }
 
-    url = String(url || '').trim();
+    url = normalizeManagedImageUrl_(url);
+    fallbackUrl = String(fallbackUrl || '').trim();
     key = String(key || url || '').trim();
 
     if (!url) {
       image.classList.add('hidden');
       image.removeAttribute('src');
+      delete image.dataset.managedLoadedUrl;
       placeholder.classList.remove('hidden');
       return;
     }
 
+    if (
+      String(image.dataset.managedLoadedUrl || '') === url &&
+      image.complete &&
+      Number(image.naturalWidth || 0) > 0
+    ) {
+      image.classList.remove('hidden', 'managed-image-loading', 'managed-image-fallback');
+      placeholder.classList.add('hidden');
+      return;
+    }
+
+    image.decoding = 'async';
+    image.loading = 'eager';
+    try {
+      image.fetchPriority = 'high';
+    } catch (error) {}
+
     let retryCount = 0;
+    let usingFallback = false;
 
     const applySource = () => {
-      const targetUrl = buildRetryImageUrl_(url, retryCount);
+      const sourceUrl = usingFallback ? fallbackUrl : url;
+      const targetUrl = buildRetryImageUrl_(sourceUrl, retryCount);
 
       image.onload = () => {
-        image.classList.remove('hidden');
+        image.dataset.managedLoadedUrl = sourceUrl;
+        image.classList.remove('hidden', 'managed-image-loading', 'managed-image-fallback');
         placeholder.classList.add('hidden');
       };
 
       image.onerror = () => {
-        if (retryCount < 2) {
+        if (retryCount < 1) {
           retryCount += 1;
-          window.setTimeout(applySource, 350 + retryCount * 220);
+          window.setTimeout(applySource, 250);
+          return;
+        }
+
+        if (!usingFallback && fallbackUrl && fallbackUrl !== url) {
+          usingFallback = true;
+          retryCount = 0;
+          applySource();
           return;
         }
 
         console.warn('[image-load-failed]', {
           key: key,
-          url: url,
+          url: sourceUrl,
           retryCount: retryCount,
           error: 'avatar-load-failed'
         });
         image.classList.add('hidden');
         image.removeAttribute('src');
+        delete image.dataset.managedLoadedUrl;
         placeholder.classList.remove('hidden');
       };
 
-      image.classList.remove('managed-image-loading');
-      image.classList.remove('managed-image-fallback');
-      image.classList.remove('hidden');
+      image.classList.add('managed-image-loading');
+      image.classList.remove('managed-image-fallback', 'hidden');
       placeholder.classList.add('hidden');
-      image.src = targetUrl;
+      if (image.getAttribute('src') !== targetUrl) {
+        image.src = targetUrl;
+      }
     };
 
     applySource();
@@ -1304,18 +1347,19 @@ const STORAGE_KEY = 'yct_current_player';
     }
 
     state.imageCache = state.imageCache || {};
+    const cacheKey = url;
 
-    if (state.imageCache[key] && state.imageCache[key].status === 'loaded') {
-      return Promise.resolve(state.imageCache[key].url);
+    if (state.imageCache[cacheKey] && state.imageCache[cacheKey].status === 'loaded') {
+      return Promise.resolve(state.imageCache[cacheKey].url);
     }
 
-    if (state.imageCache[key] && state.imageCache[key].promise) {
-      return state.imageCache[key].promise;
+    if (state.imageCache[cacheKey] && state.imageCache[cacheKey].promise) {
+      return state.imageCache[cacheKey].promise;
     }
 
     const promise = enqueueImageLoad_(() => loadImageWithRetry_(key, url, 0))
       .then((loadedUrl) => {
-        state.imageCache[key] = {
+        state.imageCache[cacheKey] = {
           status: 'loaded',
           url: loadedUrl
         };
@@ -1323,11 +1367,11 @@ const STORAGE_KEY = 'yct_current_player';
         return loadedUrl;
       })
       .catch((error) => {
-        delete state.imageCache[key];
+        delete state.imageCache[cacheKey];
         throw error;
       });
 
-    state.imageCache[key] = {
+    state.imageCache[cacheKey] = {
       status: 'loading',
       promise: promise
     };
@@ -1395,7 +1439,7 @@ const STORAGE_KEY = 'yct_current_player';
 
     const separator = url.indexOf('?') === -1 ? '?' : '&';
 
-    return url + separator + 'v=' + encodeURIComponent(ASSET_VERSION) +
+    return url + separator + 'v=' + encodeURIComponent(IMAGE_ASSET_VERSION) +
       '&retry=' + retryCount;
   }
 
@@ -4764,7 +4808,13 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function renderAvatar(player) {
-    const url = String(player.avatarUrl || '').trim();
+    player = player || {};
+    const localUrl = getAvatarUrl(player.avatarGender, player.avatarNo);
+    const configuredUrl = String(player.avatarUrl || '').trim();
+    const primaryUrl = localUrl || configuredUrl;
+    const remoteFallback = localUrl
+      ? (configuredUrl || getRemoteAvatarUrl_(player.avatarGender, player.avatarNo))
+      : '';
 
     [
       ['#homeAvatarImg', '#homeAvatarPlaceholder'],
@@ -4773,15 +4823,18 @@ const STORAGE_KEY = 'yct_current_player';
       const image = $(imageSelector);
       const placeholder = $(placeholderSelector);
 
-      if (url) {
+      if (primaryUrl) {
         setAvatarImageSource_(
           image,
           placeholder,
-          url,
-          'playerAvatar:' + String(player.playerId || '') + ':' + url
+          primaryUrl,
+          'playerAvatar:' + String(player.playerId || '') + ':' + primaryUrl,
+          remoteFallback
         );
       } else {
         image.classList.add('hidden');
+        image.removeAttribute('src');
+        delete image.dataset.managedLoadedUrl;
         placeholder.classList.remove('hidden');
       }
     });
@@ -7940,7 +7993,7 @@ function clearPrayerAutoScroll(selector) {
 
     const padded = String(number).padStart(3, '0');
 
-    return REMOTE_AVATAR_BASE_URL +
+    return LOCAL_AVATAR_BASE_URL +
       (
         normalized === 'female'
           ? '/avatar-female/avatar-female-direct-'
@@ -7948,6 +8001,12 @@ function clearPrayerAutoScroll(selector) {
       ) +
       padded +
       '.png';
+  }
+
+  function getRemoteAvatarUrl_(gender, no) {
+    const localUrl = getAvatarUrl(gender, no);
+    if (!localUrl) return '';
+    return localUrl.replace(LOCAL_AVATAR_BASE_URL, REMOTE_AVATAR_BASE_URL);
   }
 
   function buildRandomAvatar(gender) {
