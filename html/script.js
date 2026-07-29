@@ -5,7 +5,7 @@ const STORAGE_KEY = 'yct_current_player';
   const ASSET_BASE_URL = '..';
   const REMOTE_AVATAR_BASE_URL =
     'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const ASSET_VERSION = '20260728-v01321-fix12-rc13';
+  const ASSET_VERSION = '20260729-v01321-fix12-two-stage5';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -269,33 +269,85 @@ const STORAGE_KEY = 'yct_current_player';
     checkHomeSyncState_();
   }
 
+  const TASK_WRITE_SYNC_RETRY_DELAYS_MS = [0, 1200, 2000, 3000, 5000];
+
+  function finishTaskWriteSyncTracking_(eventId) {
+    const tracking = state.taskWriteSyncInFlight[eventId];
+    if (tracking && tracking.timerId) {
+      window.clearTimeout(tracking.timerId);
+    }
+    delete state.taskWriteSyncInFlight[eventId];
+  }
+
   function continueTaskWriteProcessing_(eventId, kind) {
-    eventId = String(eventId || '');
+    eventId = String(eventId || '').trim();
     if (!eventId || state.taskWriteSyncInFlight[eventId]) return;
-    state.taskWriteSyncInFlight[eventId] = true;
-    callServer('processTaskWriteEvent', { eventId })
-      .then((res) => {
-        const data = res && res.data || {};
-        if (isSuccess(res) && String(data.status || '') === 'COMPLETED' && data.result) {
-          applyCompletedTaskWriteResult_(kind, data.result);
-          const detail = TASK_PERFORMANCE_PROBE_ENABLED && data.result.performance
-            ? '（後端同步 ' + (Number(data.result.performance.totalMilliseconds || 0) / 1000).toFixed(1) + ' 秒）'
-            : '';
-          setResultMessage('#homeMessage', '任務與點數已同步' + detail, true);
-          return;
-        }
-        if (String(data.status || '') === 'FAILED') {
-          setResultMessage('#homeMessage', String(data.error || '任務已儲存，但點數同步需要管理者檢查。'), false);
-          return;
-        }
-        setResultMessage('#homeMessage', '任務已儲存，點數將由系統自動同步。', true);
-      })
-      .catch(() => {
-        setResultMessage('#homeMessage', '任務已儲存，點數將由系統自動同步。', true);
-      })
-      .finally(() => {
-        delete state.taskWriteSyncInFlight[eventId];
-      });
+
+    state.taskWriteSyncInFlight[eventId] = {
+      attempt: 0,
+      timerId: 0
+    };
+
+    const runAttempt = () => {
+      const tracking = state.taskWriteSyncInFlight[eventId];
+      if (!tracking) return;
+      const attemptIndex = Number(tracking.attempt || 0);
+
+      callServer('processTaskWriteEvent', { eventId })
+        .then((res) => {
+          const data = res && res.data || {};
+          if (isSuccess(res) && String(data.status || '') === 'COMPLETED' && data.result) {
+            applyCompletedTaskWriteResult_(kind, data.result);
+            notifyOtherAppInstances_('taskWriteCompleted');
+            const detail = TASK_PERFORMANCE_PROBE_ENABLED && data.result.performance
+              ? '（後端同步 ' + (Number(data.result.performance.totalMilliseconds || 0) / 1000).toFixed(1) + ' 秒）'
+              : '';
+            setResultMessage('#homeMessage', '任務與點數已同步' + detail, true);
+            finishTaskWriteSyncTracking_(eventId);
+            return;
+          }
+
+          if (String(data.status || '') === 'FAILED') {
+            setResultMessage(
+              '#homeMessage',
+              String(data.error || '任務已儲存，但點數同步需要管理者檢查。'),
+              false
+            );
+            finishTaskWriteSyncTracking_(eventId);
+            return;
+          }
+
+          const nextAttempt = attemptIndex + 1;
+          if (nextAttempt >= TASK_WRITE_SYNC_RETRY_DELAYS_MS.length) {
+            setResultMessage('#homeMessage', '任務已儲存，點數將由系統自動同步。', true);
+            finishTaskWriteSyncTracking_(eventId);
+            return;
+          }
+
+          tracking.attempt = nextAttempt;
+          tracking.timerId = window.setTimeout(
+            runAttempt,
+            TASK_WRITE_SYNC_RETRY_DELAYS_MS[nextAttempt]
+          );
+        })
+        .catch(() => {
+          const current = state.taskWriteSyncInFlight[eventId];
+          if (!current) return;
+          const nextAttempt = Number(current.attempt || 0) + 1;
+          if (nextAttempt >= TASK_WRITE_SYNC_RETRY_DELAYS_MS.length) {
+            setResultMessage('#homeMessage', '任務已儲存，點數將由系統自動同步。', true);
+            finishTaskWriteSyncTracking_(eventId);
+            return;
+          }
+          current.attempt = nextAttempt;
+          current.timerId = window.setTimeout(
+            runAttempt,
+            TASK_WRITE_SYNC_RETRY_DELAYS_MS[nextAttempt]
+          );
+        });
+    };
+
+    runAttempt();
   }
 
   const STALE_REQUEST_ERROR_CODE = 'STALE_REQUEST';
