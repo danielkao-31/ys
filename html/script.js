@@ -3,9 +3,10 @@ const STORAGE_KEY = 'yct_current_player';
   const APP_SYNC_SIGNAL_KEY = 'yct_app_sync_signal';
   const APP_SYNC_CHANNEL_NAME = 'yct_app_sync_v1';
   const ASSET_BASE_URL = '..';
+  const LOCAL_AVATAR_BASE_URL = ASSET_BASE_URL;
   const REMOTE_AVATAR_BASE_URL =
     'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const ASSET_VERSION = '20260729-v01321-fix12-two-stage5';
+  const IMAGE_ASSET_VERSION = '20260728-v01321-assets1';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -158,6 +159,168 @@ const STORAGE_KEY = 'yct_current_player';
     return base.replace('任務已儲存（', '任務已儲存，點數同步中（');
   }
 
+  function getOfficialHomeScoreSnapshot_() {
+    return {
+      personalPoints: Math.max(0, Number(
+        state.currentPlayer && state.currentPlayer.totalScore || 0
+      )),
+      groupPoints: state.homeGroupEnabled === false
+        ? 0
+        : Math.max(0, Number(
+            state.groupJourney && state.groupJourney.totalScore || 0
+          ))
+    };
+  }
+
+  function normalizeTaskScorePreviewDelta_(delta) {
+    delta = delta || {};
+    return {
+      personalPoints: Math.max(0, Number(delta.personalPoints || 0)),
+      groupPoints: Math.max(0, Number(delta.groupPoints || 0)),
+      selectedTaskField: String(delta.selectedTaskField || '').trim(),
+      source: String(delta.source || '').trim()
+    };
+  }
+
+  function getPendingTaskScorePreviewTotals_() {
+    return Object.keys(state.pendingTaskScorePreviews || {}).reduce(
+      (totals, previewKey) => {
+        const preview = normalizeTaskScorePreviewDelta_(
+          state.pendingTaskScorePreviews[previewKey]
+        );
+        totals.personalPoints += preview.personalPoints;
+        totals.groupPoints += preview.groupPoints;
+        return totals;
+      },
+      { personalPoints: 0, groupPoints: 0 }
+    );
+  }
+
+  function renderPendingTaskScorePreview_() {
+    const official = getOfficialHomeScoreSnapshot_();
+    const pending = getPendingTaskScorePreviewTotals_();
+    const baseline = state.pendingTaskScoreBaseline || {
+      personalPoints: official.personalPoints,
+      groupPoints: official.groupPoints
+    };
+    const hasPending = Object.keys(state.pendingTaskScorePreviews || {}).length > 0;
+    const contributionValue = hasPending
+      ? Math.max(
+          official.personalPoints,
+          Number(baseline.personalPoints || 0) + pending.personalPoints
+        )
+      : official.personalPoints;
+    const groupValue = state.homeGroupEnabled === false
+      ? 0
+      : (hasPending
+          ? Math.max(
+              official.groupPoints,
+              Number(baseline.groupPoints || 0) + pending.groupPoints
+            )
+          : official.groupPoints);
+
+    const contributionText = $('#homeContributionText');
+    const groupText = $('#homeGroupScoreText');
+    if (contributionText) contributionText.textContent = formatNumber(contributionValue);
+    if (groupText) groupText.textContent = formatNumber(groupValue);
+
+    const contributionBadge = $('#homeContributionSyncText');
+    if (contributionBadge) {
+      contributionBadge.hidden = pending.personalPoints <= 0;
+      contributionBadge.textContent = pending.personalPoints > 0
+        ? '+' + formatNumber(pending.personalPoints) + ' 待確認・同步中'
+        : '';
+    }
+
+    const groupBadge = $('#homeGroupSyncText');
+    if (groupBadge) {
+      const visibleGroupPending = state.homeGroupEnabled !== false
+        ? pending.groupPoints
+        : 0;
+      groupBadge.hidden = visibleGroupPending <= 0;
+      groupBadge.textContent = visibleGroupPending > 0
+        ? '+' + formatNumber(visibleGroupPending) + ' 待確認・同步中'
+        : '';
+    }
+  }
+
+  function beginPendingTaskScorePreview_(previewKey, delta) {
+    previewKey = String(previewKey || '').trim();
+    const normalized = normalizeTaskScorePreviewDelta_(delta);
+    if (!previewKey || (!normalized.personalPoints && !normalized.groupPoints)) return;
+
+    const currentKeys = Object.keys(state.pendingTaskScorePreviews || {});
+    if (!currentKeys.length) {
+      const official = getOfficialHomeScoreSnapshot_();
+      state.pendingTaskScoreBaseline = {
+        personalPoints: official.personalPoints,
+        groupPoints: official.groupPoints
+      };
+    }
+    state.pendingTaskScorePreviews[previewKey] = normalized;
+    renderPendingTaskScorePreview_();
+  }
+
+  function replacePendingTaskScorePreview_(oldKey, newKey, delta) {
+    oldKey = String(oldKey || '').trim();
+    newKey = String(newKey || '').trim();
+    if (oldKey) delete state.pendingTaskScorePreviews[oldKey];
+
+    const normalized = normalizeTaskScorePreviewDelta_(delta);
+    if (newKey && (normalized.personalPoints || normalized.groupPoints)) {
+      state.pendingTaskScorePreviews[newKey] = normalized;
+    }
+    if (!Object.keys(state.pendingTaskScorePreviews).length) {
+      const official = getOfficialHomeScoreSnapshot_();
+      state.pendingTaskScoreBaseline = {
+        personalPoints: official.personalPoints,
+        groupPoints: official.groupPoints
+      };
+    }
+    renderPendingTaskScorePreview_();
+  }
+
+  function removePendingTaskScorePreview_(previewKey, deferRender) {
+    previewKey = String(previewKey || '').trim();
+    if (previewKey) delete state.pendingTaskScorePreviews[previewKey];
+    if (!deferRender) rebasePendingTaskScorePreview_();
+  }
+
+  function rebasePendingTaskScorePreview_() {
+    const official = getOfficialHomeScoreSnapshot_();
+    state.pendingTaskScoreBaseline = {
+      personalPoints: official.personalPoints,
+      groupPoints: official.groupPoints
+    };
+    renderPendingTaskScorePreview_();
+  }
+
+  function clearPendingTaskScorePreviews_() {
+    state.pendingTaskScorePreviews = {};
+    const official = getOfficialHomeScoreSnapshot_();
+    state.pendingTaskScoreBaseline = {
+      personalPoints: official.personalPoints,
+      groupPoints: official.groupPoints
+    };
+    renderPendingTaskScorePreview_();
+  }
+
+  function buildClientTaskScorePreview_(kind, taskType) {
+    const config = kind === 'DAILY'
+      ? PRACTICE_CONFIG[taskType]
+      : WEEKLY_TASK_CONFIG[taskType];
+    const points = Math.max(0, Number(config && config.score || 0));
+    const cooperative = kind === 'DAILY'
+      ? taskType === 'morning'
+      : taskType === 'outreachVisit';
+    return {
+      personalPoints: cooperative ? 0 : points,
+      groupPoints: points,
+      selectedTaskField: String(config && config.field || ''),
+      source: 'LOADED_TASK_CONFIG'
+    };
+  }
+
   function mergeCompletedTaskRecord_(currentRecord, incomingRecord, fields) {
     const current = currentRecord || {};
     const incoming = incomingRecord || {};
@@ -237,6 +400,38 @@ const STORAGE_KEY = 'yct_current_player';
     return true;
   }
 
+  function applyCompletedTaskOfficialScores_(result) {
+    result = result || {};
+    const scores = result.officialScores || null;
+    const player = state.currentPlayer || null;
+    if (!scores || !player) return false;
+
+    const currentPlayerId = String(player.playerId || '').trim();
+    const currentGroupId = String(player.groupId || '').trim();
+    const currentCycleId = String(
+      state.currentCycleId || player.currentCycleId || ''
+    ).trim();
+    if (String(scores.playerId || '').trim() !== currentPlayerId) return false;
+    if (String(scores.groupId || '').trim() !== currentGroupId) return false;
+    if (String(scores.cycleId || '').trim() && currentCycleId &&
+        String(scores.cycleId || '').trim() !== currentCycleId) return false;
+
+    state.currentPlayer = Object.assign({}, player, {
+      totalScore: Math.max(0, Number(scores.personalPoints || 0))
+    });
+    persistCurrentPlayer();
+
+    if (state.groupJourney) {
+      state.groupJourney = Object.assign({}, state.groupJourney, {
+        totalScore: Math.max(0, Number(scores.groupPoints || 0)),
+        myContributionScore: Math.max(0, Number(scores.personalPoints || 0))
+      });
+    }
+    renderPlayer(state.currentPlayer);
+    if (state.groupJourney) renderGroupJourney(state.groupJourney);
+    return true;
+  }
+
   function applyCompletedTaskWriteResult_(kind, result) {
     result = result || {};
     if (kind === 'DAILY' && result.record &&
@@ -264,12 +459,15 @@ const STORAGE_KEY = 'yct_current_player';
     if (kind === 'MEETING') invalidateByRule_('meetingPracticeChanged');
     renderDailyStatus();
     renderWeeklyTaskStatus();
-    applyCompletedTaskPlayerSnapshot_(kind, result);
-    applyRewardSummaryToHome(result.rewardSummary);
+    const officialScoresApplied = applyCompletedTaskOfficialScores_(result);
+    if (!officialScoresApplied) {
+      applyCompletedTaskPlayerSnapshot_(kind, result);
+      applyRewardSummaryToHome(result.rewardSummary);
+    }
     checkHomeSyncState_();
   }
 
-  const TASK_WRITE_SYNC_RETRY_DELAYS_MS = [0, 1200, 2000, 3000, 5000];
+  const TASK_WRITE_SYNC_RETRY_DELAYS_MS = [0, 1200, 2000, 3000, 5000, 8000, 13000, 20000];
 
   function finishTaskWriteSyncTracking_(eventId) {
     const tracking = state.taskWriteSyncInFlight[eventId];
@@ -296,8 +494,14 @@ const STORAGE_KEY = 'yct_current_player';
       callServer('processTaskWriteEvent', { eventId })
         .then((res) => {
           const data = res && res.data || {};
+          if (data.optimisticDelta) {
+            replacePendingTaskScorePreview_(eventId, eventId, data.optimisticDelta);
+          }
+
           if (isSuccess(res) && String(data.status || '') === 'COMPLETED' && data.result) {
+            removePendingTaskScorePreview_(eventId, true);
             applyCompletedTaskWriteResult_(kind, data.result);
+            rebasePendingTaskScorePreview_();
             notifyOtherAppInstances_('taskWriteCompleted');
             const detail = TASK_PERFORMANCE_PROBE_ENABLED && data.result.performance
               ? '（後端同步 ' + (Number(data.result.performance.totalMilliseconds || 0) / 1000).toFixed(1) + ' 秒）'
@@ -308,6 +512,7 @@ const STORAGE_KEY = 'yct_current_player';
           }
 
           if (String(data.status || '') === 'FAILED') {
+            removePendingTaskScorePreview_(eventId);
             setResultMessage(
               '#homeMessage',
               String(data.error || '任務已儲存，但點數同步需要管理者檢查。'),
@@ -447,6 +652,7 @@ const STORAGE_KEY = 'yct_current_player';
       config.description = String(source.description || '').trim();
 
       const score = Math.max(0, Number(source.score || 0));
+      config.score = score;
       config.reward = String(source.reward || '').trim() ||
         (
           type === 'morning'
@@ -463,6 +669,7 @@ const STORAGE_KEY = 'yct_current_player';
       config.description = String(source.description || '').trim();
 
       const score = Math.max(0, Number(source.score || 0));
+      config.score = score;
       config.reward = String(source.reward || '').trim() ||
         (
           type === 'outreachVisit'
@@ -549,6 +756,11 @@ const STORAGE_KEY = 'yct_current_player';
     pendingDailyRequestId: '',
     pendingWeeklyRequestId: '',
     taskWriteSyncInFlight: {},
+    pendingTaskScorePreviews: {},
+    pendingTaskScoreBaseline: {
+      personalPoints: 0,
+      groupPoints: 0
+    },
     pendingPrayerResponseRequestIds: {},
     pendingGroupCreateRequestId: '',
     pendingGroupCreateSignature: '',
@@ -588,7 +800,6 @@ const STORAGE_KEY = 'yct_current_player';
   function initApp() {
     initializeLoginFieldProtection_();
     applySavedTheme();
-    preloadCriticalBackgrounds_();
     bindEvents();
     initRegisterAvatar();
     hydrateExistingImages_();
@@ -928,31 +1139,18 @@ const STORAGE_KEY = 'yct_current_player';
     window.addEventListener('focus', handleAppResume_);
   }
 
-  function preloadCriticalBackgrounds_() {
-    const root = document.documentElement;
-    const backgroundAssets = [
-      ['--asset-bg-mobile', 'appBgMobile'],
-      ['--asset-bg-desktop', 'appBgDesktop'],
-      ['--asset-hero-mobile', 'heroMobile'],
-      ['--asset-hero-desktop', 'heroDesktop'],
-      ['--asset-journey-mobile', 'journeyMobile'],
-      ['--asset-journey-desktop', 'journeyDesktop'],
-      ['--asset-game-camp', 'gameCamp'],
-      ['--asset-game-panel', 'gamePanel'],
-      ['--asset-chest-hero', 'chest01']
-    ];
+  function normalizeManagedImageUrl_(url) {
+    url = String(url || '').trim();
+    if (!url) return '';
 
-    backgroundAssets.forEach(([cssVar, key]) => {
-      loadManagedImage_(key, IMAGE_ASSETS[key])
-        .then((url) => {
-          root.style.setProperty(cssVar, 'url("' + url + '")');
-        })
-        .catch(() => {
-          if (key.indexOf('chest') === 0) {
-            root.style.setProperty(cssVar, 'url("' + IMAGE_FALLBACK_DATA_URL + '")');
-          }
-        });
-    });
+    const avatarMatch = url.match(
+      /\/((?:avatar-male|avatar-female)\/(?:avatar-male|avatar-female)-direct-\d{3}\.png)(?:[?#].*)?$/i
+    );
+    if (avatarMatch) {
+      return ASSET_BASE_URL + '/' + avatarMatch[1];
+    }
+
+    return url;
   }
 
   function hydrateExistingImages_(root) {
@@ -990,20 +1188,42 @@ const STORAGE_KEY = 'yct_current_player';
     }
 
     options = options || {};
+    url = normalizeManagedImageUrl_(url);
     const fallbackUrl =
       Object.prototype.hasOwnProperty.call(options, 'fallbackUrl')
         ? options.fallbackUrl
         : IMAGE_FALLBACK_DATA_URL;
+    const currentUrl = String(img.dataset.managedLoadedUrl || '').trim();
+
+    if (
+      currentUrl === url &&
+      img.complete &&
+      Number(img.naturalWidth || 0) > 0
+    ) {
+      img.classList.remove('managed-image-loading', 'managed-image-fallback');
+      return Promise.resolve(url);
+    }
+
+    img.decoding = 'async';
+    if (options.priority === 'high') {
+      img.loading = 'eager';
+      try {
+        img.fetchPriority = 'high';
+      } catch (error) {}
+    } else {
+      img.loading = options.loading === 'eager' ? 'eager' : 'lazy';
+    }
 
     img.classList.add('managed-image-loading');
     img.classList.remove('managed-image-fallback');
-    img.removeAttribute('src');
 
     return loadManagedImage_(key || url, url)
       .then((loadedUrl) => {
-        img.src = loadedUrl;
-        img.classList.remove('managed-image-loading');
-        img.classList.remove('managed-image-fallback');
+        if (img.getAttribute('src') !== loadedUrl) {
+          img.src = loadedUrl;
+        }
+        img.dataset.managedLoadedUrl = url;
+        img.classList.remove('managed-image-loading', 'managed-image-fallback');
         return loadedUrl;
       })
       .catch((error) => {
@@ -1018,9 +1238,13 @@ const STORAGE_KEY = 'yct_current_player';
         }
 
         if (fallbackUrl) {
-          img.src = fallbackUrl;
+          if (img.getAttribute('src') !== fallbackUrl) {
+            img.src = fallbackUrl;
+          }
+          img.dataset.managedLoadedUrl = fallbackUrl;
         } else {
           img.removeAttribute('src');
+          delete img.dataset.managedLoadedUrl;
         }
 
         img.classList.remove('managed-image-loading');
@@ -1031,54 +1255,84 @@ const STORAGE_KEY = 'yct_current_player';
       });
   }
 
-  function setAvatarImageSource_(image, placeholder, url, key) {
+  function setAvatarImageSource_(image, placeholder, url, key, fallbackUrl) {
     if (!image || !placeholder) {
       return;
     }
 
-    url = String(url || '').trim();
+    url = normalizeManagedImageUrl_(url);
+    fallbackUrl = String(fallbackUrl || '').trim();
     key = String(key || url || '').trim();
 
     if (!url) {
       image.classList.add('hidden');
       image.removeAttribute('src');
+      delete image.dataset.managedLoadedUrl;
       placeholder.classList.remove('hidden');
       return;
     }
 
+    if (
+      String(image.dataset.managedLoadedUrl || '') === url &&
+      image.complete &&
+      Number(image.naturalWidth || 0) > 0
+    ) {
+      image.classList.remove('hidden', 'managed-image-loading', 'managed-image-fallback');
+      placeholder.classList.add('hidden');
+      return;
+    }
+
+    image.decoding = 'async';
+    image.loading = 'eager';
+    try {
+      image.fetchPriority = 'high';
+    } catch (error) {}
+
     let retryCount = 0;
+    let usingFallback = false;
 
     const applySource = () => {
-      const targetUrl = buildRetryImageUrl_(url, retryCount);
+      const sourceUrl = usingFallback ? fallbackUrl : url;
+      const targetUrl = buildRetryImageUrl_(sourceUrl, retryCount);
 
       image.onload = () => {
-        image.classList.remove('hidden');
+        image.dataset.managedLoadedUrl = sourceUrl;
+        image.classList.remove('hidden', 'managed-image-loading', 'managed-image-fallback');
         placeholder.classList.add('hidden');
       };
 
       image.onerror = () => {
-        if (retryCount < 2) {
+        if (retryCount < 1) {
           retryCount += 1;
-          window.setTimeout(applySource, 350 + retryCount * 220);
+          window.setTimeout(applySource, 250);
+          return;
+        }
+
+        if (!usingFallback && fallbackUrl && fallbackUrl !== url) {
+          usingFallback = true;
+          retryCount = 0;
+          applySource();
           return;
         }
 
         console.warn('[image-load-failed]', {
           key: key,
-          url: url,
+          url: sourceUrl,
           retryCount: retryCount,
           error: 'avatar-load-failed'
         });
         image.classList.add('hidden');
         image.removeAttribute('src');
+        delete image.dataset.managedLoadedUrl;
         placeholder.classList.remove('hidden');
       };
 
-      image.classList.remove('managed-image-loading');
-      image.classList.remove('managed-image-fallback');
-      image.classList.remove('hidden');
+      image.classList.add('managed-image-loading');
+      image.classList.remove('managed-image-fallback', 'hidden');
       placeholder.classList.add('hidden');
-      image.src = targetUrl;
+      if (image.getAttribute('src') !== targetUrl) {
+        image.src = targetUrl;
+      }
     };
 
     applySource();
@@ -1093,18 +1347,19 @@ const STORAGE_KEY = 'yct_current_player';
     }
 
     state.imageCache = state.imageCache || {};
+    const cacheKey = url;
 
-    if (state.imageCache[key] && state.imageCache[key].status === 'loaded') {
-      return Promise.resolve(state.imageCache[key].url);
+    if (state.imageCache[cacheKey] && state.imageCache[cacheKey].status === 'loaded') {
+      return Promise.resolve(state.imageCache[cacheKey].url);
     }
 
-    if (state.imageCache[key] && state.imageCache[key].promise) {
-      return state.imageCache[key].promise;
+    if (state.imageCache[cacheKey] && state.imageCache[cacheKey].promise) {
+      return state.imageCache[cacheKey].promise;
     }
 
     const promise = enqueueImageLoad_(() => loadImageWithRetry_(key, url, 0))
       .then((loadedUrl) => {
-        state.imageCache[key] = {
+        state.imageCache[cacheKey] = {
           status: 'loaded',
           url: loadedUrl
         };
@@ -1112,11 +1367,11 @@ const STORAGE_KEY = 'yct_current_player';
         return loadedUrl;
       })
       .catch((error) => {
-        delete state.imageCache[key];
+        delete state.imageCache[cacheKey];
         throw error;
       });
 
-    state.imageCache[key] = {
+    state.imageCache[cacheKey] = {
       status: 'loading',
       promise: promise
     };
@@ -1184,7 +1439,7 @@ const STORAGE_KEY = 'yct_current_player';
 
     const separator = url.indexOf('?') === -1 ? '?' : '&';
 
-    return url + separator + 'v=' + encodeURIComponent(ASSET_VERSION) +
+    return url + separator + 'v=' + encodeURIComponent(IMAGE_ASSET_VERSION) +
       '&retry=' + retryCount;
   }
 
@@ -3694,14 +3949,12 @@ const STORAGE_KEY = 'yct_current_player';
 
     $('#heroGreetingText').textContent = '';
 
-    $('#homeContributionText').textContent = formatNumber(contribution);
-
-
     $('#myPlayerName').textContent = displayName;
     $('#myGroupName').textContent = buildHandbookAffiliationText(player);
 
     $('#homeStreakText').textContent =
       Number(player.dailyStreak || 0) + ' 天';
+    renderPendingTaskScorePreview_();
     renderHomeChestSummary(state.chestSummary || createEmptyChestSummary());
 
     renderAvatar(player);
@@ -4555,7 +4808,13 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function renderAvatar(player) {
-    const url = String(player.avatarUrl || '').trim();
+    player = player || {};
+    const localUrl = getAvatarUrl(player.avatarGender, player.avatarNo);
+    const configuredUrl = String(player.avatarUrl || '').trim();
+    const primaryUrl = localUrl || configuredUrl;
+    const remoteFallback = localUrl
+      ? (configuredUrl || getRemoteAvatarUrl_(player.avatarGender, player.avatarNo))
+      : '';
 
     [
       ['#homeAvatarImg', '#homeAvatarPlaceholder'],
@@ -4564,15 +4823,18 @@ const STORAGE_KEY = 'yct_current_player';
       const image = $(imageSelector);
       const placeholder = $(placeholderSelector);
 
-      if (url) {
+      if (primaryUrl) {
         setAvatarImageSource_(
           image,
           placeholder,
-          url,
-          'playerAvatar:' + String(player.playerId || '') + ':' + url
+          primaryUrl,
+          'playerAvatar:' + String(player.playerId || '') + ':' + primaryUrl,
+          remoteFallback
         );
       } else {
         image.classList.add('hidden');
+        image.removeAttribute('src');
+        delete image.dataset.managedLoadedUrl;
         placeholder.classList.remove('hidden');
       }
     });
@@ -4584,6 +4846,7 @@ const STORAGE_KEY = 'yct_current_player';
 
       const disabledGroupScore = $('#homeGroupScoreText');
       if (disabledGroupScore) disabledGroupScore.textContent = '0';
+      renderPendingTaskScorePreview_();
 
       $('#homeJourneyProgressText').textContent = '0%';
       $('#homeJourneyNextText').textContent =
@@ -4630,6 +4893,7 @@ const STORAGE_KEY = 'yct_current_player';
     if (homeGroupScore) {
       homeGroupScore.textContent = formatNumber(totalScore);
     }
+    renderPendingTaskScorePreview_();
 
     $('#homeJourneyProgressText').textContent =
       Math.max(0, Number(journey.progressPercent || 0)) +
@@ -4825,10 +5089,16 @@ const STORAGE_KEY = 'yct_current_player';
     };
 
     payload[config.field] = true;
+    payload.selectedTaskField = config.field;
     payload.clientMutationPeriodKey = getTaipeiBusinessDate_();
     const pendingDaily = beginPendingMutationRequest_('daily-practice', payload);
     state.pendingDailyRequestId = pendingDaily.requestId;
     payload.requestId = pendingDaily.requestId;
+    const localPreviewKey = 'LOCAL_DAILY::' + payload.requestId;
+    beginPendingTaskScorePreview_(
+      localPreviewKey,
+      buildClientTaskScorePreview_('DAILY', state.selectedPracticeType)
+    );
 
     const taskRequestStartedAt = Date.now();
     setLoading(true, '儲存今日任務...');
@@ -4836,6 +5106,7 @@ const STORAGE_KEY = 'yct_current_player';
     callServer('submitDailyPractice', payload)
       .then((res) => {
         if (!isSuccess(res)) {
+          removePendingTaskScorePreview_(localPreviewKey);
           settlePendingMutationRequest_('daily-practice', payload.requestId, res);
           setResultMessage(
             '#practiceModalMessage',
@@ -4851,6 +5122,11 @@ const STORAGE_KEY = 'yct_current_player';
             ['morningRevival', 'bibleReading', 'prayer', 'bookPursuit']
           );
         }
+        replacePendingTaskScorePreview_(
+          localPreviewKey,
+          res.data.eventId,
+          res.data.optimisticDelta
+        );
         settlePendingMutationRequest_('daily-practice', payload.requestId, res);
         state.pendingDailyRequestId = '';
         invalidateByRule_('dailyPracticeChanged');
@@ -4863,10 +5139,13 @@ const STORAGE_KEY = 'yct_current_player';
         if (res.data.processingPending && res.data.eventId) {
           continueTaskWriteProcessing_(res.data.eventId, 'DAILY');
         } else {
-          applyRewardSummaryToHome(res.data.rewardSummary);
+          removePendingTaskScorePreview_(res.data.eventId || localPreviewKey, true);
+          applyCompletedTaskWriteResult_('DAILY', res.data);
+          rebasePendingTaskScorePreview_();
         }
       })
       .catch((error) => {
+        removePendingTaskScorePreview_(localPreviewKey);
         setResultMessage('#practiceModalMessage', getErrorMessage(error));
       })
       .finally(() => {
@@ -5021,12 +5300,18 @@ const STORAGE_KEY = 'yct_current_player';
     };
 
     payload[config.field] = true;
+    payload.selectedTaskField = config.field;
     payload.clientMutationPeriodKey = String(
       state.weeklyTaskRecord && state.weeklyTaskRecord.weekKey || getTaipeiIsoWeekKey_()
     );
     const pendingMeeting = beginPendingMutationRequest_('meeting-practice', payload);
     state.pendingWeeklyRequestId = pendingMeeting.requestId;
     payload.requestId = pendingMeeting.requestId;
+    const localPreviewKey = 'LOCAL_MEETING::' + payload.requestId;
+    beginPendingTaskScorePreview_(
+      localPreviewKey,
+      buildClientTaskScorePreview_('MEETING', state.selectedWeeklyTaskType)
+    );
 
     const taskRequestStartedAt = Date.now();
     setLoading(true, '儲存本週任務...');
@@ -5034,6 +5319,7 @@ const STORAGE_KEY = 'yct_current_player';
     callServer('submitMeetingPractice', payload)
       .then((res) => {
         if (!isSuccess(res)) {
+          removePendingTaskScorePreview_(localPreviewKey);
           settlePendingMutationRequest_('meeting-practice', payload.requestId, res);
           setResultMessage(
             '#weeklyTaskModalMessage',
@@ -5049,6 +5335,11 @@ const STORAGE_KEY = 'yct_current_player';
             ['smallGroup', 'prayerMeeting', 'lordDayMeeting', 'outreachVisit']
           );
         }
+        replacePendingTaskScorePreview_(
+          localPreviewKey,
+          res.data.eventId,
+          res.data.optimisticDelta
+        );
         settlePendingMutationRequest_('meeting-practice', payload.requestId, res);
         state.pendingWeeklyRequestId = '';
         invalidateByRule_('meetingPracticeChanged');
@@ -5061,10 +5352,13 @@ const STORAGE_KEY = 'yct_current_player';
         if (res.data.processingPending && res.data.eventId) {
           continueTaskWriteProcessing_(res.data.eventId, 'MEETING');
         } else {
-          applyRewardSummaryToHome(res.data.rewardSummary);
+          removePendingTaskScorePreview_(res.data.eventId || localPreviewKey, true);
+          applyCompletedTaskWriteResult_('MEETING', res.data);
+          rebasePendingTaskScorePreview_();
         }
       })
       .catch((error) => {
+        removePendingTaskScorePreview_(localPreviewKey);
         setResultMessage('#weeklyTaskModalMessage', getErrorMessage(error));
       })
       .finally(() => {
@@ -6689,6 +6983,7 @@ function clearPrayerAutoScroll(selector) {
     if (previousPlayerId && previousPlayerId !== nextPlayerId) {
       clearPendingMutationRequestsForPlayer_(previousPlayerId);
       clearMessageSuppressionRetryForPlayer_(previousPlayerId);
+      clearPendingTaskScorePreviews_();
     }
 
     state.sessionGeneration += 1;
@@ -6749,6 +7044,8 @@ function clearPrayerAutoScroll(selector) {
     state.currentCycleId = '';
     state.pendingDailyRequestId = '';
     state.pendingWeeklyRequestId = '';
+    state.pendingTaskScorePreviews = {};
+    state.pendingTaskScoreBaseline = { personalPoints: 0, groupPoints: 0 };
     state.pendingPrayerResponseRequestIds = {};
     state.pendingGroupCreateRequestId = '';
     state.pendingGroupCreateSignature = '';
@@ -7696,7 +7993,7 @@ function clearPrayerAutoScroll(selector) {
 
     const padded = String(number).padStart(3, '0');
 
-    return REMOTE_AVATAR_BASE_URL +
+    return LOCAL_AVATAR_BASE_URL +
       (
         normalized === 'female'
           ? '/avatar-female/avatar-female-direct-'
@@ -7704,6 +8001,12 @@ function clearPrayerAutoScroll(selector) {
       ) +
       padded +
       '.png';
+  }
+
+  function getRemoteAvatarUrl_(gender, no) {
+    const localUrl = getAvatarUrl(gender, no);
+    if (!localUrl) return '';
+    return localUrl.replace(LOCAL_AVATAR_BASE_URL, REMOTE_AVATAR_BASE_URL);
   }
 
   function buildRandomAvatar(gender) {
