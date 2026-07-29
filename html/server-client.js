@@ -61,6 +61,47 @@
     return match ? Number(match[1]) : -1;
   }
 
+  function parseSemverParts_(value) {
+    const match = String(value || '').trim().match(
+      /^(?:v)?(\d+)(?:\.(\d+|x|\*))?(?:\.(\d+|x|\*))?$/
+    );
+    if (!match) return null;
+    return [
+      Number(match[1]),
+      /^(?:x|\*)$/i.test(match[2] || '0') ? null : Number(match[2] || 0),
+      /^(?:x|\*)$/i.test(match[3] || '0') ? null : Number(match[3] || 0)
+    ];
+  }
+
+  function compareSemverParts_(left, right) {
+    for (let index = 0; index < 3; index += 1) {
+      const difference = Number(left[index] || 0) - Number(right[index] || 0);
+      if (difference) return difference;
+    }
+    return 0;
+  }
+
+  function isVersionWithinBound_(version, bound, isMaximum) {
+    if (!bound) return true;
+    const parsedVersion = parseSemverParts_(version);
+    const parsedBound = parseSemverParts_(bound);
+    if (!parsedVersion || !parsedBound) return false;
+    if (parsedVersion[0] !== parsedBound[0]) {
+      return isMaximum
+        ? parsedVersion[0] < parsedBound[0]
+        : parsedVersion[0] > parsedBound[0];
+    }
+    if (parsedBound[1] == null) return true;
+    if (parsedVersion[1] !== parsedBound[1]) {
+      return isMaximum
+        ? parsedVersion[1] < parsedBound[1]
+        : parsedVersion[1] > parsedBound[1];
+    }
+    if (parsedBound[2] == null) return true;
+    const comparison = compareSemverParts_(parsedVersion, parsedBound);
+    return isMaximum ? comparison <= 0 : comparison >= 0;
+  }
+
   function isApiContractCompatible_(actualVersion, expectedVersion, supportedRange) {
     const actualMajor = getSemverMajor_(actualVersion);
     const expectedMajor = getSemverMajor_(expectedVersion);
@@ -71,8 +112,12 @@
 
     const minVersion = String(supportedRange && supportedRange.MIN || '').trim();
     const maxVersion = String(supportedRange && supportedRange.MAX || '').trim();
-    if (minVersion && getSemverMajor_(minVersion) !== expectedMajor) return false;
-    if (maxVersion && getSemverMajor_(maxVersion) !== expectedMajor) return false;
+    if (!isVersionWithinBound_(expectedVersion, minVersion, false)) {
+      return false;
+    }
+    if (!isVersionWithinBound_(expectedVersion, maxVersion, true)) {
+      return false;
+    }
 
     return true;
   }

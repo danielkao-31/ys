@@ -20,12 +20,12 @@ const STORAGE_KEY = 'yct_current_player';
     );
   const IMAGE_ASSETS = (() => {
     const assets = {
-      appBgMobile: ASSET_BASE_URL + '/UI/app-bg-cute-v4.png',
-      appBgDesktop: ASSET_BASE_URL + '/UI/app-bg-cute-v4.png',
-      heroMobile: ASSET_BASE_URL + '/UI/hero-journey-cute-v4.png',
-      heroDesktop: ASSET_BASE_URL + '/UI/hero-journey-cute-v4.png',
-      journeyMobile: ASSET_BASE_URL + '/UI/journey-map-cute-v4.png',
-      journeyDesktop: ASSET_BASE_URL + '/UI/journey-map-cute-v4.png',
+      appBgMobile: ASSET_BASE_URL + '/UI/app-bg-mobile.png',
+      appBgDesktop: ASSET_BASE_URL + '/UI/app-bg-desktop.png',
+      heroMobile: ASSET_BASE_URL + '/UI/hero-journey-bg-mobile.png',
+      heroDesktop: ASSET_BASE_URL + '/UI/hero-journey-bg-desktop.png',
+      journeyMobile: ASSET_BASE_URL + '/UI/journey-map-bg-mobile.png',
+      journeyDesktop: ASSET_BASE_URL + '/UI/journey-map-bg-desktop.png',
       gameCamp: ASSET_BASE_URL + '/UI/board-panel-cute-v4.png',
       gamePanel: ASSET_BASE_URL + '/UI/quest-panel-cute-v4.png',
       iconPrayerLink: ASSET_BASE_URL + '/UI/icon-prayer-link.png',
@@ -56,20 +56,14 @@ const STORAGE_KEY = 'yct_current_player';
     'getHomeSyncState',
     'getPlayerMessageCenter',
     'getMyVitalGroups',
-    'getDailyPracticeStatus',
-    'getDailyPracticeHistory',
-    'getMeetingPracticeStatus',
-    'getMeetingPracticeHistory',
     'getMyFootprintDashboard',
-    'getPrayerRequests',
     'getPrayerCarousel',
     'getMyPrayerRequests',
     'getPlayerProfile',
     'getGroupJourney',
     'getGroupJourneyList',
     'getPlayerChestCollection',
-    'getMyGroupContributionSummary',
-    'getGrowthSummary'
+    'getMyGroupContributionSummary'
   ];
   const SESSION_PAYLOAD_APIS = [
     'updatePlayerAvatar',
@@ -88,6 +82,7 @@ const STORAGE_KEY = 'yct_current_player';
     'submitDailyPractice',
     'submitMeetingPractice',
     'processTaskWriteEvent',
+    'getTaskWriteEventStatus',
     'searchPrayerRequests',
     'createPrayerRequest',
     'getPrayerRequestDetail',
@@ -117,7 +112,9 @@ const STORAGE_KEY = 'yct_current_player';
     accountProfile: 3 * 60 * 1000,
     groupInfo: 3 * 60 * 1000
   };
-  const HOME_SYNC_POLL_MS = 20 * 1000;
+  const HOME_SYNC_POLL_MS = 60 * 1000;
+  const HOME_SYNC_MIN_GAP_MS = 30 * 1000;
+  const HOME_SYNC_RESUME_DEBOUNCE_MS = 1500;
   const SERVER_READ_CALL_TIMEOUT_MS = 90 * 1000;
   const CACHE_LOADING_PROMISE_TTL_MS = SERVER_READ_CALL_TIMEOUT_MS + 5 * 1000;
   const TASK_PERFORMANCE_PROBE_ENABLED = (() => {
@@ -477,23 +474,36 @@ const STORAGE_KEY = 'yct_current_player';
     delete state.taskWriteSyncInFlight[eventId];
   }
 
-  function continueTaskWriteProcessing_(eventId, kind) {
+  function continueTaskWriteProcessing_(eventId, kind, queueRowNumber) {
     eventId = String(eventId || '').trim();
     if (!eventId || state.taskWriteSyncInFlight[eventId]) return;
 
     state.taskWriteSyncInFlight[eventId] = {
       attempt: 0,
-      timerId: 0
+      timerId: 0,
+      queueRowNumber: Number(queueRowNumber || 0)
     };
 
     const runAttempt = () => {
       const tracking = state.taskWriteSyncInFlight[eventId];
       if (!tracking) return;
       const attemptIndex = Number(tracking.attempt || 0);
+      const shouldProcess =
+        attemptIndex === 0 ||
+        attemptIndex === TASK_WRITE_SYNC_RETRY_DELAYS_MS.length - 1;
+      const action = shouldProcess
+        ? 'processTaskWriteEvent'
+        : 'getTaskWriteEventStatus';
 
-      callServer('processTaskWriteEvent', { eventId })
+      callServer(action, {
+        eventId,
+        queueRowNumber: Number(tracking.queueRowNumber || 0)
+      })
         .then((res) => {
           const data = res && res.data || {};
+          if (Number(data.queueRowNumber || 0) >= 2) {
+            tracking.queueRowNumber = Number(data.queueRowNumber);
+          }
           if (data.optimisticDelta) {
             replacePendingTaskScorePreview_(eventId, eventId, data.optimisticDelta);
           }
@@ -786,6 +796,8 @@ const STORAGE_KEY = 'yct_current_player';
     businessDate: '',
     homeSyncToken: '',
     homeSyncCheckInFlight: false,
+    homeSyncLastCheckedAt: 0,
+    homeSyncResumeTimer: null,
     crossDayRefreshTimer: null,
     homeSyncTimer: null,
     appSyncChannel: null
@@ -944,18 +956,24 @@ const STORAGE_KEY = 'yct_current_player';
     return true;
   }
 
-  function checkHomeSyncState_() {
+  function checkHomeSyncState_(options) {
+    options = options || {};
+    const now = Date.now();
     if (
       state.homeSyncCheckInFlight ||
       !state.sessionToken ||
       !state.currentPlayer ||
       !state.currentPlayer.playerId ||
-      document.visibilityState === 'hidden'
+      document.visibilityState === 'hidden' ||
+      (!options.force &&
+        now - Number(state.homeSyncLastCheckedAt || 0) <
+          HOME_SYNC_MIN_GAP_MS)
     ) {
       return;
     }
 
     state.homeSyncCheckInFlight = true;
+    state.homeSyncLastCheckedAt = now;
 
     callServer('getHomeSyncState')
       .then((res) => {
@@ -1077,7 +1095,7 @@ const STORAGE_KEY = 'yct_current_player';
       return;
     }
 
-    checkHomeSyncState_();
+    checkHomeSyncState_({ force: true });
   }
 
   function initializeCrossTabSync_() {
@@ -1110,7 +1128,13 @@ const STORAGE_KEY = 'yct_current_player';
     const crossedDate = handleBusinessDateBoundary_();
 
     if (!crossedDate) {
-      checkHomeSyncState_();
+      if (state.homeSyncResumeTimer) {
+        window.clearTimeout(state.homeSyncResumeTimer);
+      }
+      state.homeSyncResumeTimer = window.setTimeout(() => {
+        state.homeSyncResumeTimer = null;
+        checkHomeSyncState_();
+      }, HOME_SYNC_RESUME_DEBOUNCE_MS);
     }
   }
 
@@ -5156,7 +5180,11 @@ const STORAGE_KEY = 'yct_current_player';
         closeModal('practiceModal');
         setResultMessage('#homeMessage', performanceMessage, true);
         if (res.data.processingPending && res.data.eventId) {
-          continueTaskWriteProcessing_(res.data.eventId, 'DAILY');
+          continueTaskWriteProcessing_(
+            res.data.eventId,
+            'DAILY',
+            res.data.queueRowNumber
+          );
         } else {
           removePendingTaskScorePreview_(res.data.eventId || localPreviewKey, true);
           applyCompletedTaskWriteResult_('DAILY', res.data);
@@ -5369,7 +5397,11 @@ const STORAGE_KEY = 'yct_current_player';
         closeModal('weeklyTaskModal');
         setResultMessage('#homeMessage', performanceMessage, true);
         if (res.data.processingPending && res.data.eventId) {
-          continueTaskWriteProcessing_(res.data.eventId, 'MEETING');
+          continueTaskWriteProcessing_(
+            res.data.eventId,
+            'MEETING',
+            res.data.queueRowNumber
+          );
         } else {
           removePendingTaskScorePreview_(res.data.eventId || localPreviewKey, true);
           applyCompletedTaskWriteResult_('MEETING', res.data);
