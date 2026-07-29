@@ -1717,11 +1717,30 @@ const STORAGE_KEY = 'yct_current_player';
     closeAllModals();
     hideAllViews();
     $('#bottomNav').classList.add('hidden');
-    setLoadingError_(
-      safeMessage,
-      '重新載入',
-      () => window.location.reload()
-    );
+    setLoadingError_(safeMessage, [
+      {
+        text: '重新載入',
+        handler: () => window.location.reload()
+      },
+      {
+        text: '返回登入',
+        secondary: true,
+        handler: exitFailedRestoredSession_
+      }
+    ]);
+  }
+
+  function exitFailedRestoredSession_() {
+    const token = String(state.sessionToken || '').trim();
+
+    notifyOtherAppInstances_('sessionRevoked');
+    clearCurrentSession();
+    $('#loginPassword').value = '';
+    showAuth();
+    showAuthMessage('已清除本機登入狀態，請重新登入。');
+    setLoading(false);
+
+    revokeSessionInBackground_(token);
   }
 
   function readStoredSession() {
@@ -6946,26 +6965,25 @@ function clearPrayerAutoScroll(selector) {
   }
 
   function logout() {
-    const token = state.sessionToken;
+    const token = String(state.sessionToken || '').trim();
 
-    setLoading(true, '登出中...');
+    notifyOtherAppInstances_('sessionRevoked');
+    clearCurrentSession();
+    $('#loginPassword').value = '';
+    showAuth();
+    setLoading(false);
 
-    const finishLogout = () => {
-      notifyOtherAppInstances_('sessionRevoked');
-      clearCurrentSession();
-      $('#loginPassword').value = '';
-      showAuth();
-      setLoading(false);
-    };
+    revokeSessionInBackground_(token);
+  }
 
-    if (!token) {
-      finishLogout();
+  function revokeSessionInBackground_(token) {
+    token = String(token || '').trim();
+
+    if (!token || !window.GasBackend || typeof window.GasBackend.invoke !== 'function') {
       return;
     }
 
-    callServer('logoutPlayer', token)
-      .catch(() => null)
-      .finally(finishLogout);
+    window.GasBackend.invoke('logoutPlayer', [token]).catch(() => null);
   }
 
   function establishCurrentSession_(sessionToken, player, keepLogin) {
@@ -7179,16 +7197,18 @@ function clearPrayerAutoScroll(selector) {
     box.classList.remove('success');
   }
 
+  function clearLoadingActions_(overlay) {
+    overlay.querySelectorAll('.loading-actions').forEach((element) => {
+      element.remove();
+    });
+  }
+
   function setLoading(show, text) {
     const overlay = $('#loadingOverlay');
     const card = overlay.querySelector('.loading-card');
     const spinner = overlay.querySelector('.spinner');
-    const oldAction = overlay.querySelector('.loading-action-btn');
 
-    if (oldAction) {
-      oldAction.remove();
-    }
-
+    clearLoadingActions_(overlay);
     overlay.classList.toggle('hidden', !show);
     overlay.classList.remove('is-error');
 
@@ -7203,16 +7223,13 @@ function clearPrayerAutoScroll(selector) {
     $('#loadingText').textContent = text || '處理中...';
   }
 
-  function setLoadingError_(message, actionText, handler) {
+  function setLoadingError_(message, actions) {
     const overlay = $('#loadingOverlay');
     const card = overlay.querySelector('.loading-card');
     const spinner = overlay.querySelector('.spinner');
-    const oldAction = overlay.querySelector('.loading-action-btn');
+    const actionList = Array.isArray(actions) ? actions : [];
 
-    if (oldAction) {
-      oldAction.remove();
-    }
-
+    clearLoadingActions_(overlay);
     overlay.classList.remove('hidden');
     overlay.classList.add('is-error');
 
@@ -7227,13 +7244,30 @@ function clearPrayerAutoScroll(selector) {
     $('#loadingText').textContent =
       message || '資料載入失敗，請重新整理或稍後再試';
 
-    if (actionText && typeof handler === 'function' && card) {
+    if (!card || !actionList.length) {
+      return;
+    }
+
+    const actionContainer = document.createElement('div');
+    actionContainer.className = 'loading-actions';
+
+    actionList.forEach((action) => {
+      if (!action || !action.text || typeof action.handler !== 'function') {
+        return;
+      }
+
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = 'loading-action-btn';
-      button.textContent = actionText;
-      button.addEventListener('click', handler);
-      card.appendChild(button);
+      button.className = action.secondary
+        ? 'loading-action-btn is-secondary'
+        : 'loading-action-btn';
+      button.textContent = action.text;
+      button.addEventListener('click', action.handler);
+      actionContainer.appendChild(button);
+    });
+
+    if (actionContainer.childElementCount) {
+      card.appendChild(actionContainer);
     }
   }
 

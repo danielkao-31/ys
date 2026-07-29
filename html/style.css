@@ -1871,14 +1871,28 @@ button.player-stat-card{
     text-align:center;
 }
 
+.loading-actions{
+  display:flex;
+    flex-direction:column;
+    gap:8px;
+    width:100%;
+}
+
 .loading-action-btn{
   border:0;
     border-radius:999px;
+    min-height:44px;
     padding:10px 16px;
     color:#fff;
     background:linear-gradient(180deg,var(--brand),var(--brand-deep));
     font-weight:900;
     box-shadow:0 3px 0 rgba(120,70,55,.24);
+}
+
+.loading-action-btn.is-secondary{
+  color:var(--ink);
+    background:#f6eee8;
+    box-shadow:0 3px 0 rgba(120,70,55,.12);
 }
 
 .spinner{
