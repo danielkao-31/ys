@@ -32,11 +32,9 @@
 
   function getApiUrl_(action) {
     const config = global.APP_RUNTIME_CONFIG || {};
-    return String(
-      isAdminAction_(action)
-        ? config.adminGasWebAppUrl
-        : config.gasWebAppUrl
-    ).trim();
+    const publicUrl = String(config.gasWebAppUrl || '').trim();
+    const adminUrl = String(config.adminGasWebAppUrl || '').trim();
+    return isAdminAction_(action) ? (adminUrl || publicUrl) : publicUrl;
   }
 
   function validateApiUrl_(url, action) {
@@ -48,14 +46,6 @@
       throw new Error('GAS Web App 網址格式錯誤，必須使用完整的 /exec 網址');
     }
 
-    if (isAdminAction_(action)) {
-      const config = global.APP_RUNTIME_CONFIG || {};
-      const publicUrl = String(config.gasWebAppUrl || '').trim();
-
-      if (publicUrl && url === publicUrl) {
-        throw new Error('管理 API 必須使用獨立的受限制 GAS Web App /exec 網址');
-      }
-    }
   }
 
   function getRequestTimeoutMs_(action) {

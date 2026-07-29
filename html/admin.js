@@ -193,7 +193,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         .finally(() => setLoading(false));
     }
 
-    function logout(message){
+    function clearLocalAdminSession_(message){
       state.token = '';
       state.loadingDepth = 0;
       sessionStorage.removeItem(ADMIN_STORAGE_KEY);
@@ -201,6 +201,14 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
       $('#loading').classList.add('hidden');
       showLogin();
       if(message) showMessage('#loginMessage',message,'error');
+    }
+
+    function logout(message,skipServerLogout){
+      const token = state.token;
+      clearLocalAdminSession_(message);
+      if(!skipServerLogout && token){
+        window.GasBackend.invoke('adminLogout',[token]).catch(() => {});
+      }
     }
 
     function switchTab(tab){
@@ -2544,7 +2552,7 @@ const ADMIN_STORAGE_KEY = 'yct_admin_token';
         window.GasBackend.invoke(functionName,args)
           .then((res) => {
             if(functionName !== 'adminLogin' && isAuthError(res && res.error)){
-              logout(res.error);
+              logout(res.error,true);
               reject(new Error(res.error));
               return;
             }

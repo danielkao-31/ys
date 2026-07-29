@@ -6,7 +6,9 @@
  */
 window.APP_RUNTIME_CONFIG = Object.freeze({
   gasWebAppUrl: 'https://script.google.com/macros/s/AKfycbwP3NSPi1CXfUeaMkLj_bvae3kQgCrP0-8QYfrA4EmWAemTqMIBJxrjGzcBG2uDjPOI/exec',
+  // 留空時管理後台沿用 gasWebAppUrl；有獨立管理部署時再填入其 /exec。
   adminGasWebAppUrl: '',
+  releaseVersion: 'v0.13.21-rebuild1',
   expectedApiContractVersion: '1.2.0',
-  assetVersion: '20260729-v01321-fix12-two-stage7-image-speed1'
+  assetVersion: '20260729-v01321-rebuild1'
 });
