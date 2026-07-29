@@ -5053,6 +5053,33 @@ body{
   color:#2f8f7e;
 }
 
+#homeView .hero-score-card .score-sync-badge{
+  position:absolute;
+  left:50%;
+  bottom:2px;
+  z-index:2;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  max-width:calc(100% - 8px);
+  min-height:14px;
+  padding:1px 5px;
+  border-radius:999px;
+  background:rgba(255,255,255,.92);
+  color:#8a5b32;
+  font-size:8px;
+  font-style:normal;
+  font-weight:950;
+  line-height:1.15;
+  white-space:nowrap;
+  transform:translateX(-50%);
+  box-shadow:0 1px 3px rgba(89,58,41,.18);
+}
+
+#homeView .hero-score-card .score-sync-badge[hidden]{
+  display:none;
+}
+
 #homeView .hero-contribution{
   background:linear-gradient(180deg,#fffbe5,#f1d5b8);
     color:#78544e;
@@ -5276,6 +5303,13 @@ body{
     font-weight:900;
     line-height:1;
     white-space:nowrap;
+}
+
+#homeView .home-hero-card .hero-score-grid .hero-score-card .score-sync-badge{
+  left:10px;
+  bottom:2px;
+  max-width:104px;
+  transform:none;
 }
 
 #homeView .home-hero-card .hero-score-grid .hero-score-card .hero-meter{
