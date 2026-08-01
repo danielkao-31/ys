@@ -3094,15 +3094,15 @@ body[data-theme="night"] .auth-hero{
     --shadow-soft:0 7px 18px rgba(44,56,60,.09);
     --radius:22px;
     --radius-small:15px;
-    --asset-bg-mobile:url("../UI/app-bg-mobile.png");
-    --asset-bg-desktop:url("../UI/app-bg-desktop.png");
-    --asset-hero-mobile:url("../UI/hero-journey-bg-mobile.png");
-    --asset-hero-desktop:url("../UI/hero-journey-bg-desktop.png");
-    --asset-journey-mobile:url("../UI/journey-map-bg-mobile.png");
-    --asset-journey-desktop:url("../UI/journey-map-bg-desktop.png");
-    --asset-game-camp:url("../UI/board-panel-cute-v4.png");
-    --asset-game-panel:url("../UI/quest-panel-cute-v4.png");
-    --asset-chest-hero:url("../Chest_Assets/Chest_01.png");
+    --asset-bg-mobile:url("../UI/app-bg-cute-v4.png?v=20260801-v01322-visualfix1");
+    --asset-bg-desktop:url("../UI/app-bg-cute-v4.png?v=20260801-v01322-visualfix1");
+    --asset-hero-mobile:url("../UI/hero-journey-cute-v4.png?v=20260801-v01322-visualfix1");
+    --asset-hero-desktop:url("../UI/hero-journey-cute-v4.png?v=20260801-v01322-visualfix1");
+    --asset-journey-mobile:url("../UI/journey-map-cute-v4.png?v=20260801-v01322-visualfix1");
+    --asset-journey-desktop:url("../UI/journey-map-cute-v4.png?v=20260801-v01322-visualfix1");
+    --asset-game-camp:url("../UI/board-panel-cute-v4.png?v=20260801-v01322-visualfix1");
+    --asset-game-panel:url("../UI/quest-panel-cute-v4.png?v=20260801-v01322-visualfix1");
+    --asset-chest-hero:url("../Chest_Assets/Chest_01.png?v=20260801-v01322-visualfix1");
     --cute-ink:#6b514d;
     --cute-line:#a8877b;
     --cute-panel:#fff9ef;
@@ -6531,5 +6531,37 @@ body{
 
   .chest-detail-copy p{
     font-size:15px;
+  }
+}
+
+/* Desktop artwork overrides must remain after the mobile-first theme rules. */
+@media (min-width:760px){
+  body{
+    background:var(--asset-bg-desktop) center top / cover fixed no-repeat;
+  }
+
+  #homeView .home-hero-card{
+    background:linear-gradient(90deg,rgba(255,255,255,.16),rgba(255,255,255,.02)),
+        var(--asset-hero-desktop) center / cover no-repeat;
+  }
+
+  .auth-hero{
+    background-image:linear-gradient(135deg,rgba(20,35,43,.66),rgba(20,48,49,.16) 55%,rgba(216,120,80,.18)),
+        var(--asset-hero-desktop);
+  }
+
+  body[data-theme="fresh"] .auth-hero{
+    background-image:linear-gradient(135deg,rgba(27,77,73,.6),rgba(77,159,139,.18) 56%,rgba(217,180,90,.2)),
+        var(--asset-hero-desktop);
+  }
+
+  body[data-theme="night"] .auth-hero{
+    background-image:linear-gradient(135deg,rgba(23,31,55,.78),rgba(47,89,141,.34) 58%,rgba(209,169,74,.2)),
+        var(--asset-hero-desktop);
+  }
+
+  #homeView .journey-map-card{
+    background:linear-gradient(180deg,rgba(255,253,247,.76),rgba(255,236,217,.72)),
+        var(--asset-journey-desktop) center / cover no-repeat;
   }
 }

@@ -6,7 +6,7 @@ const STORAGE_KEY = 'yct_current_player';
   const LOCAL_AVATAR_BASE_URL = ASSET_BASE_URL;
   const REMOTE_AVATAR_BASE_URL =
     'https://raw.githubusercontent.com/danielkao-31/ys/main';
-  const IMAGE_ASSET_VERSION = '20260728-v01321-assets1';
+  const IMAGE_ASSET_VERSION = '20260801-v01322-visualfix1';
   const IMAGE_FALLBACK_DATA_URL =
     'data:image/svg+xml;charset=UTF-8,' +
     encodeURIComponent(
@@ -20,12 +20,12 @@ const STORAGE_KEY = 'yct_current_player';
     );
   const IMAGE_ASSETS = (() => {
     const assets = {
-      appBgMobile: ASSET_BASE_URL + '/UI/app-bg-mobile.png',
-      appBgDesktop: ASSET_BASE_URL + '/UI/app-bg-desktop.png',
-      heroMobile: ASSET_BASE_URL + '/UI/hero-journey-bg-mobile.png',
-      heroDesktop: ASSET_BASE_URL + '/UI/hero-journey-bg-desktop.png',
-      journeyMobile: ASSET_BASE_URL + '/UI/journey-map-bg-mobile.png',
-      journeyDesktop: ASSET_BASE_URL + '/UI/journey-map-bg-desktop.png',
+      appBgMobile: ASSET_BASE_URL + '/UI/app-bg-cute-v4.png',
+      appBgDesktop: ASSET_BASE_URL + '/UI/app-bg-cute-v4.png',
+      heroMobile: ASSET_BASE_URL + '/UI/hero-journey-cute-v4.png',
+      heroDesktop: ASSET_BASE_URL + '/UI/hero-journey-cute-v4.png',
+      journeyMobile: ASSET_BASE_URL + '/UI/journey-map-cute-v4.png',
+      journeyDesktop: ASSET_BASE_URL + '/UI/journey-map-cute-v4.png',
       gameCamp: ASSET_BASE_URL + '/UI/board-panel-cute-v4.png',
       gamePanel: ASSET_BASE_URL + '/UI/quest-panel-cute-v4.png',
       iconPrayerLink: ASSET_BASE_URL + '/UI/icon-prayer-link.png',
@@ -1457,14 +1457,18 @@ const STORAGE_KEY = 'yct_current_player';
   }
 
   function buildRetryImageUrl_(url, retryCount) {
-    if (!retryCount || url.indexOf('data:') === 0) {
+    if (url.indexOf('data:') === 0) {
       return url;
     }
 
     const separator = url.indexOf('?') === -1 ? '?' : '&';
+    const versionedUrl = /[?&]v=/.test(url)
+      ? url
+      : url + separator + 'v=' + encodeURIComponent(IMAGE_ASSET_VERSION);
 
-    return url + separator + 'v=' + encodeURIComponent(IMAGE_ASSET_VERSION) +
-      '&retry=' + retryCount;
+    return retryCount
+      ? versionedUrl + '&retry=' + retryCount
+      : versionedUrl;
   }
 
   function loadSingleImage_(url) {
