@@ -3318,8 +3318,7 @@ const STORAGE_KEY = 'yct_current_player';
     setResultMessage('#vitalGroupsMessage', '', false);
     updateVitalGroupModalState(state.vitalGroups || []);
     openModal('vitalGroupsModal');
-    invalidateCache_('groupInfo');
-    loadVitalGroups();
+    loadVitalGroups(true);
   }
 
   function updateVitalGroupModalState(groups) {
@@ -3351,19 +3350,29 @@ const STORAGE_KEY = 'yct_current_player';
     $('#joinVitalGroupForm').classList.toggle('hidden', hasGroup);
   }
 
-  function loadVitalGroups() {
+  function loadVitalGroups(refreshInBackground) {
     if (!state.currentPlayer) {
       return;
     }
 
+    let renderedCachedGroups = false;
+
     if (isCacheValid_('groupInfo')) {
       state.vitalGroups = (getCache_('groupInfo') || {}).groups || [];
       renderVitalGroups();
-      return;
+      renderedCachedGroups = true;
+
+      if (!refreshInBackground) {
+        return;
+      }
+
+      invalidateCache_('groupInfo');
     }
 
-    $('#vitalGroupsList').innerHTML =
-      '<div class="empty-card">讀取活力組中...</div>';
+    if (!renderedCachedGroups) {
+      $('#vitalGroupsList').innerHTML =
+        '<div class="empty-card">讀取活力組中...</div>';
+    }
 
     loadOnce_('groupInfo', () => callServer(
       'getMyVitalGroups',
@@ -3371,10 +3380,17 @@ const STORAGE_KEY = 'yct_current_player';
     ))
       .then((res) => {
         if (!isSuccess(res)) {
-          $('#vitalGroupsList').innerHTML =
-            '<div class="empty-card">' +
-            escapeHtml(getResponseError(res, '讀取活力組失敗')) +
-            '</div>';
+          if (renderedCachedGroups) {
+            setResultMessage(
+              '#vitalGroupsMessage',
+              getResponseError(res, '活力組資料更新失敗，暫時顯示上次資料')
+            );
+          } else {
+            $('#vitalGroupsList').innerHTML =
+              '<div class="empty-card">' +
+              escapeHtml(getResponseError(res, '讀取活力組失敗')) +
+              '</div>';
+          }
           return;
         }
 
@@ -3385,10 +3401,18 @@ const STORAGE_KEY = 'yct_current_player';
         renderVitalGroups();
       })
       .catch((error) => {
-        $('#vitalGroupsList').innerHTML =
-          '<div class="empty-card">' +
-          escapeHtml(getErrorMessage(error)) +
-          '</div>';
+        if (renderedCachedGroups) {
+          setResultMessage(
+            '#vitalGroupsMessage',
+            '活力組資料更新失敗，暫時顯示上次資料：' +
+              getErrorMessage(error)
+          );
+        } else {
+          $('#vitalGroupsList').innerHTML =
+            '<div class="empty-card">' +
+            escapeHtml(getErrorMessage(error)) +
+            '</div>';
+        }
       });
   }
 
@@ -3558,8 +3582,20 @@ const STORAGE_KEY = 'yct_current_player';
 
         $('#joinVitalGroupCode').value = '';
         invalidateByRule_('groupChanged');
+        const joinedGroup = res.data && res.data.group
+          ? res.data.group
+          : null;
+
+        if (joinedGroup) {
+          state.vitalGroups = [joinedGroup];
+          setCache_('groupInfo', {
+            groups: state.vitalGroups
+          });
+          renderVitalGroups();
+        }
+
         setResultMessage('#vitalGroupsMessage', res.data.message || '已加入活力組', true);
-        loadVitalGroups();
+        loadVitalGroups(!!joinedGroup);
       })
       .catch((error) => {
         setResultMessage('#vitalGroupsMessage', getErrorMessage(error));
